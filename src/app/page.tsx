@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Home, Users, Loader2 } from 'lucide-react';
-import { clearPlayerInfo, generateId } from '@/lib/game-storage';
+import { clearPlayerInfo } from '@/lib/game-storage'; // Removed generateId as it's not used here anymore
 import { db } from '@/lib/firebase'; // Import Firestore instance
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import type { GameState } from '@/types/game';
@@ -38,35 +38,39 @@ const HomePage: NextPage = () => {
     console.log(`[CreateRoom] Generated new room code: ${newRoomCode}`);
 
     // Basic initial game state for Firestore
-    const initialGameState: Omit<GameState, 'roomCode'> & { createdAt: any } = { // Use Omit and add serverTimestamp
+    // Omit 'roomCode' as it's the document ID itself
+    const initialGameState: Omit<GameState, 'roomCode'> & { createdAt: any } = {
         question: 'Waiting for host to start...',
         answer: 0,
         players: [], // Host will join in the room page
-        timeLeft: 0,
+        timeLeft: 0, // Initial time, will be set when round starts
         isGameActive: false,
         currentRound: 0,
-        roundStartTime: null,
+        roundStartTime: null, // Set when round starts
         createdAt: serverTimestamp(), // Add a creation timestamp
     };
 
     try {
       const roomDocRef = doc(db, 'gameRooms', newRoomCode);
-      console.log(`[CreateRoom] Attempting to create Firestore document: gameRooms/${newRoomCode}`);
+      console.log(`[CreateRoom] Attempting to create Firestore document: gameRooms/${newRoomCode} with data:`, initialGameState);
       await setDoc(roomDocRef, initialGameState);
       console.log(`[CreateRoom] Successfully created Firestore document for room: ${newRoomCode}`);
 
       // Redirect to the room, passing host=true flag
+      console.log(`[CreateRoom] Redirecting to /room/${newRoomCode}?host=true`);
       router.push(`/room/${newRoomCode}?host=true`);
+      // State will reset on navigation, no need to set isCreatingRoom false here
+
     } catch (error) {
       console.error(`[CreateRoom] Error creating Firestore document for room ${newRoomCode}:`, error);
       toast({
         title: 'Error Creating Room',
-        description: 'Could not create the game room. Please try again.',
+        description: 'Could not create the game room. Please check connection or permissions and try again.', // Added detail
         variant: 'destructive',
       });
-      setIsCreatingRoom(false);
+      setIsCreatingRoom(false); // Explicitly reset state on error
     }
-    // No finally block needed for setIsCreatingRoom(false) as navigation happens on success
+    // Removed finally block as state is handled in success (navigation) or error (catch)
   };
 
   const handleJoinRoom = async () => {
@@ -91,7 +95,9 @@ const HomePage: NextPage = () => {
         if (docSnap.exists()) {
             console.log(`[JoinRoom] Room ${codeToJoin} found in Firestore. Data:`, docSnap.data());
             // Room exists, navigate to it
+            console.log(`[JoinRoom] Redirecting to /room/${codeToJoin}`);
             router.push(`/room/${codeToJoin}`);
+             // State will reset on navigation
         } else {
             console.warn(`[JoinRoom] Room ${codeToJoin} not found in Firestore.`);
             toast({
@@ -99,18 +105,18 @@ const HomePage: NextPage = () => {
                 description: `Could not find a game room with code ${codeToJoin}. Please double-check the code.`,
                 variant: 'destructive',
             });
-            setIsJoiningRoom(false);
+            setIsJoiningRoom(false); // Reset state on error
         }
     } catch (error) {
         console.error(`[JoinRoom] Error checking Firestore document for room ${codeToJoin}:`, error);
         toast({
             title: 'Error Joining Room',
-            description: 'Could not check if the room exists. Please try again.',
+            description: 'Could not check if the room exists. Please check connection and try again.', // Added detail
             variant: 'destructive',
         });
-        setIsJoiningRoom(false);
+        setIsJoiningRoom(false); // Reset state on error
     }
-     // No finally block needed for setIsJoiningRoom(false) as navigation happens on success
+     // Removed finally block as state is handled in success (navigation) or error (catch)
   };
 
   return (
@@ -118,6 +124,7 @@ const HomePage: NextPage = () => {
       <Card className="w-full shadow-lg">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-bold text-primary flex items-center justify-center gap-2">
+            {/* Reverted to SVG as requested - ensure BrainCircuit is defined or use another icon */}
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-brain-circuit"><path d="M12 5a3 3 0 1 0-5.997.142"/><path d="M18 5a3 3 0 1 0-5.997.142"/><path d="M12 12a3 3 0 1 0-5.997.142"/><path d="M18 12a3 3 0 1 0-5.997.142"/><path d="M12 19a3 3 0 1 0-5.997.142"/><path d="M18 19a3 3 0 1 0-5.997.142"/><path d="M12 8V5"/><path d="M18 8V5"/><path d="M12 15v-3"/><path d="M18 15v-3"/><path d="M12 22v-3"/><path d="M18 22v-3"/><path d="m15 6-3-1-3 1"/><path d="m15 13-3-1-3 1"/><path d="m15 20-3-1-3 1"/><path d="M9 6.14A3 3 0 0 0 9 5"/><path d="M9 13.14A3 3 0 0 0 9 12"/><path d="M9 20.14A3 3 0 0 0 9 19"/><path d="M15 6.14A3 3 0 0 1 15 5"/><path d="M15 13.14A3 3 0 0 1 15 12"/><path d="M15 20.14A3 3 0 0 1 15 19"/></svg>
             Math Mania
           </CardTitle>
