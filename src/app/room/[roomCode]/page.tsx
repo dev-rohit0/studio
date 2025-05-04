@@ -122,6 +122,7 @@ const GameRoomPage: NextPage = () => {
   const currentPlayer = gameState?.players?.find(p => p.id === localPlayerInfo?.playerId);
   const isHost = currentPlayer?.isHost ?? false; // Get isHost from the current player in the state
   const hasPlayerAnswered = currentPlayer?.hasAnswered ?? false;
+  const isPlayerCorrect = currentPlayer?.isCorrect === true; // Check if specifically correct
   const sortedPlayers = gameState?.players ? [...gameState.players].sort((a, b) => b.score - a.score) : [];
 
   // Calculate roundTimeLeft based on Firestore timestamp or local state if timestamp not yet available
@@ -299,19 +300,23 @@ const GameRoomPage: NextPage = () => {
    }, [gameState, isHost, updateFirestoreState, roomCode, localPlayerInfo]); // Added localPlayerInfo dependency
 
 
-   const nextQuestion = useCallback(async () => {
+   const nextQuestion = useCallback(async (triggeredByAllCorrect = false) => {
        // Guard clauses: Ensure gameState, player exists, is host, game is active
-       if (!gameState || !localPlayerInfo || !isHost || !gameState.isGameActive) {
-            console.log(`[nextQuestion] Aborted: gameState=${!!gameState}, localPlayerInfo=${!!localPlayerInfo}, isHost=${isHost}, isGameActive=${gameState?.isGameActive}`);
-            return;
+       // Also ensure we are not already ending the round (avoids double triggers)
+       if (!gameState || !localPlayerInfo || !isHost || !gameState.isGameActive || isRoundEnding) {
+           console.log(`[nextQuestion] Aborted: gameState=${!!gameState}, localPlayerInfo=${!!localPlayerInfo}, isHost=${isHost}, isGameActive=${gameState?.isGameActive}, isRoundEnding=${isRoundEnding}`);
+           return;
        }
-       console.log(`[nextQuestion] Host (${localPlayerInfo?.playerId}) advancing to next question in room ${roomCode}...`);
+       console.log(`[nextQuestion] Host (${localPlayerInfo?.playerId}) advancing to next question in room ${roomCode} (triggeredByAllCorrect: ${triggeredByAllCorrect})...`);
 
-       // Clear previous round end timeout if exists
+       // Clear previous round end timeout if exists (relevant if manually triggered)
        if (roundEndTimeoutRef.current) {
            clearTimeout(roundEndTimeoutRef.current);
            roundEndTimeoutRef.current = null;
        }
+       // Set isRoundEnding to true briefly to prevent race conditions, then immediately reset before state update
+       // However, it's better to reset *after* state update is complete to avoid UI flicker if update takes time.
+       // Resetting it locally immediately might be sufficient if Firestore updates are fast.
        setIsRoundEnding(false); // Reset round ending flag locally
 
        const { question, answer } = generateEquation();
@@ -335,7 +340,8 @@ const GameRoomPage: NextPage = () => {
        };
        await updateFirestoreState(newState);
        setCurrentAnswer(''); // Clear input field for the new question (locally for current player)
-   }, [gameState, isHost, updateFirestoreState, roomCode, localPlayerInfo]); // Added localPlayerInfo dependency
+       setIsRoundEnding(false); // Ensure reset after update completes
+   }, [gameState, isHost, updateFirestoreState, roomCode, localPlayerInfo, isRoundEnding]); // Added localPlayerInfo, isRoundEnding dependency
 
 
   const endRound = useCallback(async () => {
@@ -385,7 +391,7 @@ const GameRoomPage: NextPage = () => {
            roundEndTimeoutRef.current = setTimeout(() => {
                console.log(`[endRound] Results display timer finished for round ${currentState.currentRound}. Triggering next question.`);
                // Firestore listener updates gameState, so nextQuestion should have latest state.
-               setIsRoundEnding(false); // Reset flag BEFORE calling nextQuestion
+               // setIsRoundEnding(false); // Reset flag BEFORE calling nextQuestion - moved to nextQuestion start
                nextQuestion(); // Host triggers the next question
            }, RESULTS_DISPLAY_DURATION);
 
@@ -429,6 +435,28 @@ const GameRoomPage: NextPage = () => {
 
     // Include localPlayerInfo in dependencies if used inside checkTimeUp (it is, for logging)
   }, [isHost, gameState, isRoundEnding, endRound, calculateRoundTimeLeft, localPlayerInfo?.playerId]);
+
+   // Check if all players answered correctly - Host responsibility
+   useEffect(() => {
+       if (!isHost || !gameState || !gameState.isGameActive || isRoundEnding || gameState.players.length === 0) {
+           return;
+       }
+
+       const allAnswered = gameState.players.every(p => p.hasAnswered);
+       const allCorrect = allAnswered && gameState.players.every(p => p.isCorrect === true);
+
+       if (allCorrect) {
+           console.log(`[AllCorrectCheck] Host (${localPlayerInfo?.playerId}) detected all players answered correctly for round ${gameState.currentRound}. Advancing to next question.`);
+           // Optionally add a very brief delay for visual feedback before advancing
+           const advanceTimeout = setTimeout(() => {
+               if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current); // Clear any existing endRound timer
+               nextQuestion(true); // Pass flag indicating trigger reason
+           }, 500); // 500ms delay
+
+           return () => clearTimeout(advanceTimeout); // Clear timeout if component unmounts or state changes
+       }
+   }, [gameState?.players, isHost, gameState?.isGameActive, gameState?.currentRound, isRoundEnding, localPlayerInfo?.playerId, nextQuestion]);
+
 
 
   // --- Player Actions ---
@@ -502,16 +530,18 @@ const GameRoomPage: NextPage = () => {
   const handleAnswerSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       // Guard clauses: Ensure player, game state, game active, answer exists, and round not ending/time left
+      // Allow submission even if player previously answered incorrectly (retry mechanism)
       if (!localPlayerInfo || !gameState || !gameState.isGameActive || currentAnswer === '' || isRoundEnding || roundTimeLeft <= 0) {
            console.log(`[handleAnswerSubmit] Aborted: localPlayerInfo=${!!localPlayerInfo}, gameState=${!!gameState}, isGameActive=${gameState?.isGameActive}, currentAnswer=${currentAnswer}, isRoundEnding=${isRoundEnding}, roundTimeLeft=${roundTimeLeft}`);
            return;
       }
 
       const playerInState = gameState.players.find(p => p.id === localPlayerInfo.playerId);
-      // Ensure player exists in state and hasn't answered yet
-      if (!playerInState || playerInState.hasAnswered) {
-           console.log(`[handleAnswerSubmit] Aborted: playerInState=${!!playerInState}, hasAnswered=${playerInState?.hasAnswered}`);
-           return;
+      // Ensure player exists in state. Allow retry if they answered *incorrectly* before.
+      // Prevent re-submission if they already answered *correctly*.
+      if (!playerInState || (playerInState.hasAnswered && playerInState.isCorrect === true)) {
+           console.log(`[handleAnswerSubmit] Aborted: playerInState=${!!playerInState}, hasAnswered=${playerInState?.hasAnswered}, isCorrect=${playerInState?.isCorrect}`);
+           return; // Don't allow submit if already correct
       }
 
       console.log(`[handleAnswerSubmit] Player ${localPlayerInfo.playerId} submitting answer: ${currentAnswer} for round ${gameState.currentRound}`);
@@ -531,29 +561,36 @@ const GameRoomPage: NextPage = () => {
       const isAnswerCorrect = submittedAnswer === gameState.answer;
 
       // Calculate score based on remaining time (using the accurate server timestamp)
-      const startTimeMillis = gameState.roundStartTime instanceof Timestamp
-            ? gameState.roundStartTime.toMillis()
-            : typeof gameState.roundStartTime === 'number'
-            ? gameState.roundStartTime
-            : Date.now(); // Fallback
+      // Only add score if the answer is correct. No points for incorrect answers or retries that become correct.
+      // We only add score on the *first* correct answer.
+      let scoreToAdd = 0;
+      if (isAnswerCorrect && !(playerInState.hasAnswered && playerInState.isCorrect === true)) { // Check if this is the first correct answer
+            const startTimeMillis = gameState.roundStartTime instanceof Timestamp
+                  ? gameState.roundStartTime.toMillis()
+                  : typeof gameState.roundStartTime === 'number'
+                  ? gameState.roundStartTime
+                  : Date.now(); // Fallback
 
-      const timeElapsed = Math.floor((Date.now() - startTimeMillis) / 1000);
-      const timeTaken = Math.min(ROUND_DURATION, Math.max(0, timeElapsed)); // Clamp time
-      // More robust scoring: ensure positive score for correct, handle edge cases
-      const scoreToAdd = isAnswerCorrect ? Math.max(5, (ROUND_DURATION - timeTaken) * 2 + 10) : 0; // Example scoring
+            const timeElapsed = Math.floor((Date.now() - startTimeMillis) / 1000);
+            const timeTaken = Math.min(ROUND_DURATION, Math.max(0, timeElapsed)); // Clamp time
+            scoreToAdd = Math.max(5, (ROUND_DURATION - timeTaken) * 2 + 10); // Example scoring
+            console.log(`[handleAnswerSubmit] Player ${localPlayerInfo.playerId} - Correct! ScoreToAdd: ${scoreToAdd}, TimeTaken: ${timeTaken}s`);
+      } else if (!isAnswerCorrect) {
+          console.log(`[handleAnswerSubmit] Player ${localPlayerInfo.playerId} - Incorrect.`);
+      } else {
+          console.log(`[handleAnswerSubmit] Player ${localPlayerInfo.playerId} - Already answered correctly.`);
+      }
 
-      console.log(`[handleAnswerSubmit] Player ${localPlayerInfo.playerId} - Correct: ${isAnswerCorrect}, ScoreToAdd: ${scoreToAdd}, TimeTaken: ${timeTaken}s`);
 
       toast({
         title: isAnswerCorrect ? 'Correct!' : 'Incorrect',
-        description: isAnswerCorrect ? `+${scoreToAdd} points!` : `Answer was: ${gameState.answer}`,
+        description: isAnswerCorrect ? `+${scoreToAdd} points!` : `Try again!`, // Changed message for incorrect
         variant: isAnswerCorrect ? 'default' : 'destructive',
         className: isAnswerCorrect ? 'bg-accent text-accent-foreground border-accent' : '',
-        duration: 2000, // Shorter duration for answer feedback
+        duration: isAnswerCorrect ? 2000 : 1500, // Shorter duration for incorrect 'try again'
       });
 
        // Update Firestore: Find the player and update their score, hasAnswered, isCorrect
-       // This requires reading the current array, modifying it, and writing it back.
        // Using a transaction is safer for score updates, but requires more setup.
        // Read-modify-write approach (less safe with high concurrency):
        const roomDocRef = doc(db, 'gameRooms', roomCode);
@@ -572,9 +609,12 @@ const GameRoomPage: NextPage = () => {
                  p.id === localPlayerInfo.playerId
                  ? {
                      ...p,
-                     score: (p.score ?? 0) + scoreToAdd, // Ensure score is treated as number
+                     // Only update score if this is the *first* correct answer
+                     score: (p.score ?? 0) + scoreToAdd,
+                     // Mark as answered regardless of correctness (for retry logic)
                      hasAnswered: true,
-                     isCorrect: isAnswerCorrect // Set correctness based on calculation
+                     // Set correctness based on the *current* submission
+                     isCorrect: isAnswerCorrect
                     }
                  : p
               );
@@ -595,8 +635,11 @@ const GameRoomPage: NextPage = () => {
        }
 
 
-      // Clear the input field locally AFTER successful Firestore update
-      setCurrentAnswer('');
+      // Clear the input field locally ONLY if the answer was correct.
+      // Keep it if incorrect to allow editing for retry.
+      if (isAnswerCorrect) {
+          setCurrentAnswer('');
+      }
   };
 
 
@@ -880,8 +923,8 @@ const GameRoomPage: NextPage = () => {
                                 {/* Status Indicator: Show during active rounds or result phase */}
                                 {(gameState.isGameActive || isRoundEnding) && player.hasAnswered !== undefined && ( // Check hasAnswered is not undefined
                                      player.hasAnswered ? (
-                                         // If round ended or time is up, show correct/incorrect
-                                         (isRoundEnding || (roundTimeLeft <= 0 && gameState.roundStartTime)) ? ( // Check round end OR time up (with start time)
+                                         // If round ended or time is up OR if player is correct, show result
+                                         (isRoundEnding || (roundTimeLeft <= 0 && gameState.roundStartTime) || player.isCorrect === true) ? (
                                              player.isCorrect === true ? // Explicit boolean check
                                                 <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" title="Correct"/> :
                                                 player.isCorrect === false ? // Explicit boolean check (covers null/undefined indirectly if logic above is correct)
@@ -889,8 +932,8 @@ const GameRoomPage: NextPage = () => {
                                                 // Fallback if isCorrect is somehow still null/undefined after round end
                                                 <XCircle className="h-4 w-4 text-muted-foreground opacity-60 flex-shrink-0" title="Result Pending/Error" />
                                          ) : (
-                                             // Answered, but round still active
-                                             <Clock className="h-4 w-4 text-muted-foreground animate-pulse flex-shrink-0" title="Answered" />
+                                             // Answered incorrectly, but round still active (retry possible)
+                                             <Clock className="h-4 w-4 text-muted-foreground animate-pulse flex-shrink-0" title="Answered (Incorrect - Retrying)" />
                                          )
                                      ) : (
                                           // Player hasn't answered yet
@@ -936,34 +979,38 @@ const GameRoomPage: NextPage = () => {
                              // Basic sanitization - allow negative numbers
                             onChange={(e) => setCurrentAnswer(e.target.value.replace(/[^0-9-]/g, ''))}
                             className="text-center text-2xl h-14"
-                            // Disable if player has answered, time is up, or in results display phase
-                            disabled={hasPlayerAnswered || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
+                            // Disable if player has answered CORRECTLY, time is up, or in results display phase
+                            disabled={isPlayerCorrect || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
                             aria-label="Enter your answer"
-                            aria-disabled={hasPlayerAnswered || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
+                            aria-disabled={isPlayerCorrect || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
                             autoFocus // Keep focus here when question appears
                         />
                         <Button
                             type="submit"
                             className="w-full text-lg py-3"
-                            // Disable if answered, no input, time is up, or in results display phase
-                            disabled={hasPlayerAnswered || currentAnswer === '' || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
-                            aria-disabled={hasPlayerAnswered || currentAnswer === '' || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
+                            // Disable if answered CORRECTLY, no input, time is up, or in results display phase
+                            disabled={isPlayerCorrect || currentAnswer === '' || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
+                            aria-disabled={isPlayerCorrect || currentAnswer === '' || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
                          >
                              {/* Clearer button text based on state */}
-                            {hasPlayerAnswered ? 'Answer Submitted' : 'Submit Answer'}
+                            {isPlayerCorrect ? 'Correct!' : (hasPlayerAnswered ? 'Submit Again' : 'Submit Answer')}
                          </Button>
                     </form>
                      {/* Display message during results phase */}
                      {isRoundEnding && (
                         <p className="text-center text-muted-foreground animate-pulse">Revealing results... Next round soon!</p>
                      )}
-                     {/* Display message if answered but waiting for others */}
-                     {hasPlayerAnswered && !isRoundEnding && roundTimeLeft > 0 && (
-                        <p className="text-center text-muted-foreground">Answer locked in! Waiting for others...</p>
+                     {/* Display message if answered correctly */}
+                     {isPlayerCorrect && !isRoundEnding && roundTimeLeft > 0 && (
+                         <p className="text-center text-accent font-medium">Correct! Waiting for others...</p>
                      )}
-                     {/* Message if time ran out and player didn't answer */}
-                     {!hasPlayerAnswered && !isRoundEnding && roundTimeLeft <= 0 && gameState.roundStartTime && (
-                         <p className="text-center text-destructive font-medium">Time's up!</p>
+                     {/* Display message if answered incorrectly but still time */}
+                     {hasPlayerAnswered && !isPlayerCorrect && !isRoundEnding && roundTimeLeft > 0 && (
+                         <p className="text-center text-destructive">Incorrect. Keep trying!</p>
+                     )}
+                     {/* Message if time ran out and player didn't answer or answered incorrectly */}
+                     {!isPlayerCorrect && roundTimeLeft <= 0 && gameState.roundStartTime && !isRoundEnding && (
+                         <p className="text-center text-destructive font-medium">Time's up! Answer was: {gameState.answer}</p>
                      )}
                 </>
             ) : (
