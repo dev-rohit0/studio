@@ -8,18 +8,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Users } from 'lucide-react';
-import { getGameState, saveGameState, generateId, clearPlayerInfo } from '@/lib/game-storage';
-import type { GameState, Player } from '@/types/game';
+import { Home, Users, Loader2 } from 'lucide-react';
+import { clearPlayerInfo, generateId } from '@/lib/game-storage';
+import { db } from '@/lib/firebase'; // Import Firestore instance
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import type { GameState } from '@/types/game';
 
 const HomePage: NextPage = () => {
   const [roomCodeInput, setRoomCodeInput] = useState('');
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
+  const [isJoiningRoom, setIsJoiningRoom] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
     // Clear any lingering player info when returning to the home page
     clearPlayerInfo();
+    console.log("Cleared player info on home page load.");
   }, []);
 
   const generateRoomCode = (): string => {
@@ -27,11 +32,13 @@ const HomePage: NextPage = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
-  const handleCreateRoom = () => {
+  const handleCreateRoom = async () => {
+    setIsCreatingRoom(true);
     const newRoomCode = generateRoomCode();
-    // Basic initial game state - player joins on the next screen
-    const initialGameState: GameState = {
-        roomCode: newRoomCode,
+    console.log(`[CreateRoom] Generated new room code: ${newRoomCode}`);
+
+    // Basic initial game state for Firestore
+    const initialGameState: Omit<GameState, 'roomCode'> & { createdAt: any } = { // Use Omit and add serverTimestamp
         question: 'Waiting for host to start...',
         answer: 0,
         players: [], // Host will join in the room page
@@ -39,22 +46,30 @@ const HomePage: NextPage = () => {
         isGameActive: false,
         currentRound: 0,
         roundStartTime: null,
+        createdAt: serverTimestamp(), // Add a creation timestamp
     };
 
-    // Save the initial state to localStorage
-    saveGameState(newRoomCode, initialGameState);
-    console.log(`[CreateRoom] Saved initial game state for room: ${newRoomCode}`, initialGameState);
-    // Verify save
-    const verifyState = getGameState(newRoomCode);
-    console.log(`[CreateRoom] Verified saved state for room ${newRoomCode}:`, verifyState);
+    try {
+      const roomDocRef = doc(db, 'gameRooms', newRoomCode);
+      console.log(`[CreateRoom] Attempting to create Firestore document: gameRooms/${newRoomCode}`);
+      await setDoc(roomDocRef, initialGameState);
+      console.log(`[CreateRoom] Successfully created Firestore document for room: ${newRoomCode}`);
 
-
-    console.log(`Creating room with code: ${newRoomCode}`);
-    // Redirect to the room, the host will join there
-    router.push(`/room/${newRoomCode}?host=true`);
+      // Redirect to the room, passing host=true flag
+      router.push(`/room/${newRoomCode}?host=true`);
+    } catch (error) {
+      console.error(`[CreateRoom] Error creating Firestore document for room ${newRoomCode}:`, error);
+      toast({
+        title: 'Error Creating Room',
+        description: 'Could not create the game room. Please try again.',
+        variant: 'destructive',
+      });
+      setIsCreatingRoom(false);
+    }
+    // No finally block needed for setIsCreatingRoom(false) as navigation happens on success
   };
 
-  const handleJoinRoom = () => {
+  const handleJoinRoom = async () => {
     const codeToJoin = roomCodeInput.trim();
     if (!/^\d{6}$/.test(codeToJoin)) {
       toast({
@@ -65,25 +80,37 @@ const HomePage: NextPage = () => {
       return;
     }
 
+    setIsJoiningRoom(true);
     console.log(`[JoinRoom] Attempting to join room with code: ${codeToJoin}`);
-    // Check if the room exists in localStorage
-    const existingGameState = getGameState(codeToJoin);
-    console.log(`[JoinRoom] Result of getGameState for ${codeToJoin}:`, existingGameState);
 
+    try {
+        const roomDocRef = doc(db, 'gameRooms', codeToJoin);
+        console.log(`[JoinRoom] Checking Firestore document: gameRooms/${codeToJoin}`);
+        const docSnap = await getDoc(roomDocRef);
 
-    if (!existingGameState) {
-      console.error(`[JoinRoom] Room ${codeToJoin} not found in localStorage.`);
-      toast({
-        title: 'Room Not Found',
-        description: `Could not find a game room with code ${codeToJoin}. Please double-check the code.`,
-        variant: 'destructive',
-      });
-      return;
+        if (docSnap.exists()) {
+            console.log(`[JoinRoom] Room ${codeToJoin} found in Firestore. Data:`, docSnap.data());
+            // Room exists, navigate to it
+            router.push(`/room/${codeToJoin}`);
+        } else {
+            console.warn(`[JoinRoom] Room ${codeToJoin} not found in Firestore.`);
+            toast({
+                title: 'Room Not Found',
+                description: `Could not find a game room with code ${codeToJoin}. Please double-check the code.`,
+                variant: 'destructive',
+            });
+            setIsJoiningRoom(false);
+        }
+    } catch (error) {
+        console.error(`[JoinRoom] Error checking Firestore document for room ${codeToJoin}:`, error);
+        toast({
+            title: 'Error Joining Room',
+            description: 'Could not check if the room exists. Please try again.',
+            variant: 'destructive',
+        });
+        setIsJoiningRoom(false);
     }
-
-    // Room exists, navigate to it
-    console.log(`[JoinRoom] Room ${codeToJoin} found. Navigating...`);
-    router.push(`/room/${codeToJoin}`);
+     // No finally block needed for setIsJoiningRoom(false) as navigation happens on success
   };
 
   return (
@@ -101,8 +128,10 @@ const HomePage: NextPage = () => {
             onClick={handleCreateRoom}
             className="w-full text-lg py-6"
             aria-label="Create a new game room"
+            disabled={isCreatingRoom || isJoiningRoom}
           >
-            <Home className="mr-2" /> Create Room
+            {isCreatingRoom ? <Loader2 className="mr-2 animate-spin" /> : <Home className="mr-2" />}
+            {isCreatingRoom ? 'Creating...' : 'Create Room'}
           </Button>
           <div className="relative">
              <div className="absolute inset-0 flex items-center">
@@ -125,15 +154,17 @@ const HomePage: NextPage = () => {
               pattern="\d{6}"
               inputMode="numeric" // Suggest numeric keyboard on mobile
               aria-label="Enter 6-digit room code"
+              disabled={isCreatingRoom || isJoiningRoom}
             />
             <Button
               onClick={handleJoinRoom}
               variant="secondary"
               className="w-full text-lg py-6"
               aria-label="Join an existing game room"
-              disabled={roomCodeInput.length !== 6}
+              disabled={roomCodeInput.length !== 6 || isJoiningRoom || isCreatingRoom}
             >
-              <Users className="mr-2" /> Join Room
+               {isJoiningRoom ? <Loader2 className="mr-2 animate-spin" /> : <Users className="mr-2" />}
+               {isJoiningRoom ? 'Joining...' : 'Join Room'}
             </Button>
           </div>
         </CardContent>
