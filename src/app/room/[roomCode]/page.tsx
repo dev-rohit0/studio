@@ -19,7 +19,6 @@ import type { Player, GameState } from '@/types/game';
 
 const ROUND_DURATION = 30; // seconds
 const RESULTS_DISPLAY_DURATION = 3000; // milliseconds
-// SYNC_INTERVAL is no longer needed as Firestore provides real-time updates
 
 const GameRoomPage: NextPage = () => {
   const params = useParams();
@@ -38,9 +37,9 @@ const GameRoomPage: NextPage = () => {
   const [showScoreboard, setShowScoreboard] = useState(true);
   const [isRoundEnding, setIsRoundEnding] = useState(false); // Flag to manage result display timer
 
-  // const syncIntervalRef = useRef<NodeJS.Timeout | null>(null); // No longer needed
   const roundEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null); // For Firestore listener cleanup
+  const answerInputRef = useRef<HTMLInputElement>(null); // Ref for the answer input
 
   // --- Helper Functions ---
 
@@ -196,7 +195,8 @@ const GameRoomPage: NextPage = () => {
                       score: typeof p?.score === 'number' ? p?.score : 0,
                       isHost: typeof p?.isHost === 'boolean' ? p?.isHost : false,
                       hasAnswered: typeof p?.hasAnswered === 'boolean' ? p?.hasAnswered : false,
-                      isCorrect: typeof p?.isCorrect === 'boolean' ? p?.isCorrect : null, // Default to null if missing/invalid
+                      // Ensure isCorrect is explicitly boolean or null
+                      isCorrect: typeof p?.isCorrect === 'boolean' ? p.isCorrect : null,
                  })).filter(p => p.id) : [], // Filter out players with missing IDs
                  timeLeft: typeof data.timeLeft === 'number' ? data.timeLeft : 0,
                  isGameActive: typeof data.isGameActive === 'boolean' ? data.isGameActive : false,
@@ -443,6 +443,8 @@ const GameRoomPage: NextPage = () => {
        }
 
        const allAnswered = gameState.players.every(p => p.hasAnswered);
+       // Correctness check: Ensure all players who answered are marked as correct (isCorrect === true)
+       // We need to check that every player has answered AND every player is correct.
        const allCorrect = allAnswered && gameState.players.every(p => p.isCorrect === true);
 
        if (allCorrect) {
@@ -747,7 +749,7 @@ const GameRoomPage: NextPage = () => {
           });
       } finally {
             // Always navigate home after attempting to leave
-            toast({ title: `You left the room "${leavingPlayerName || 'Player'}".` });
+            toast({ title: `You left the room.` }); // Removed name as it might be stale
             router.push('/');
       }
   };
@@ -773,6 +775,25 @@ const GameRoomPage: NextPage = () => {
     });
   };
 
+  // --- Focus Input ---
+  useEffect(() => {
+    // Focus the input when game is active, round is NOT ending, time is left,
+    // AND the player hasn't answered correctly yet.
+    if (
+      gameState?.isGameActive &&
+      !isRoundEnding &&
+      roundTimeLeft > 0 &&
+      !isPlayerCorrect && // Check if the player is not already correct
+      answerInputRef.current
+    ) {
+      // Small delay can sometimes help ensure focus works after state updates/renders
+      const focusTimer = setTimeout(() => {
+         answerInputRef.current?.focus();
+         console.log("[FocusInput] Attempted to focus answer input.");
+      }, 50);
+      return () => clearTimeout(focusTimer);
+    }
+  }, [gameState?.isGameActive, gameState?.currentRound, isRoundEnding, roundTimeLeft, isPlayerCorrect]); // Add isPlayerCorrect dependency
 
   // --- Render Logic ---
 
@@ -971,6 +992,7 @@ const GameRoomPage: NextPage = () => {
 
                     <form onSubmit={handleAnswerSubmit} className="w-full space-y-2">
                         <Input
+                            ref={answerInputRef} // Assign the ref here
                             type="number" // Use number for better mobile keyboards potentially
                             inputMode="numeric" // Explicitly suggest numeric keyboard
                             pattern="[0-9-]*" // Allow digits and minus sign
@@ -983,7 +1005,7 @@ const GameRoomPage: NextPage = () => {
                             disabled={isPlayerCorrect || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
                             aria-label="Enter your answer"
                             aria-disabled={isPlayerCorrect || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
-                            autoFocus // Keep focus here when question appears
+                            // autoFocus removed, handled by useEffect now
                         />
                         <Button
                             type="submit"
@@ -1056,3 +1078,5 @@ const GameRoomPage: NextPage = () => {
 };
 
 export default GameRoomPage;
+
+    
