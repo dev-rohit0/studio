@@ -7,7 +7,7 @@ export interface Player {
   score: number;
   isHost?: boolean;
   hasAnswered?: boolean; // Has the player submitted an answer for the current round?
-  isCorrect?: boolean | undefined;   // Was their submitted answer correct? (Set at round end, undefined initially)
+  isCorrect?: boolean | null;   // Was their submitted answer correct? (Set at round end, null initially/if not answered)
 }
 
 export interface GameState {

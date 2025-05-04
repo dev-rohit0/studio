@@ -95,7 +95,15 @@ const GameRoomPage: NextPage = () => {
       const roomDocRef = doc(db, 'gameRooms', roomCode);
       try {
           console.log(`[updateFirestoreState] Updating Firestore (room: ${roomCode}) with:`, updates);
-          await updateDoc(roomDocRef, updates);
+          // Convert Timestamps back if necessary, though usually not needed for updates unless reading first
+          const updatesToSend = { ...updates };
+          if (updatesToSend.roundStartTime && typeof updatesToSend.roundStartTime === 'number') {
+            // Keep serverTimestamp logic separate if possible, handle numbers here if needed
+            console.log("Converting roundStartTime number to Firestore Timestamp potentially (check usage)");
+            // updatesToSend.roundStartTime = Timestamp.fromMillis(updatesToSend.roundStartTime); // Example, verify necessity
+          }
+
+          await updateDoc(roomDocRef, updatesToSend);
           console.log(`[updateFirestoreState] Firestore update successful for room: ${roomCode}`);
       } catch (error) {
           console.error(`[updateFirestoreState] Error updating Firestore for room ${roomCode}:`, error);
@@ -110,8 +118,9 @@ const GameRoomPage: NextPage = () => {
 
 
   // --- Derived State ---
-  const isHost = gameState?.players?.find(p => p.id === localPlayerInfo?.playerId)?.isHost ?? false;
+  // Important: Ensure gameState is not null before accessing its properties
   const currentPlayer = gameState?.players?.find(p => p.id === localPlayerInfo?.playerId);
+  const isHost = currentPlayer?.isHost ?? false; // Get isHost from the current player in the state
   const hasPlayerAnswered = currentPlayer?.hasAnswered ?? false;
   const sortedPlayers = gameState?.players ? [...gameState.players].sort((a, b) => b.score - a.score) : [];
 
@@ -129,7 +138,7 @@ const GameRoomPage: NextPage = () => {
 
     const elapsed = Math.floor((Date.now() - startTimeMillis) / 1000);
     return Math.max(0, ROUND_DURATION - elapsed);
-  }, [gameState, isRoundEnding]);
+  }, [gameState?.isGameActive, gameState?.roundStartTime, gameState?.timeLeft, isRoundEnding]); // Ensure all deps are included
 
   const [roundTimeLeft, setRoundTimeLeft] = useState(() => calculateRoundTimeLeft());
 
@@ -161,32 +170,65 @@ const GameRoomPage: NextPage = () => {
 
     // Ensure player info is loaded before setting listener
     const savedPlayerInfo = getPlayerInfo();
-    setLocalPlayerInfo(savedPlayerInfo); // Load player info once
+    // Only set localPlayerInfo here if it's not already set,
+    // joining logic below will handle setting it after state loads.
+    if (!localPlayerInfo && savedPlayerInfo) {
+      setLocalPlayerInfo(savedPlayerInfo);
+    }
+
 
     console.log(`[Listener Setup] Setting up Firestore listener for room: ${roomCode}`);
     const roomDocRef = doc(db, 'gameRooms', roomCode);
 
     unsubscribeRef.current = onSnapshot(roomDocRef, (docSnap) => {
         if (docSnap.exists()) {
-            const data = docSnap.data() as GameState; // Assume data matches GameState
-             console.log(`[onSnapshot] Received Firestore update for room ${roomCode}:`, data);
-            // Combine fetched data with the roomCode for the local state
-            setGameState({ ...data, roomCode }); // Update local state with Firestore data + roomCode
+            const data = docSnap.data() as Omit<GameState, 'roomCode'>; // Data from Firestore doesn't have roomCode
+            // console.log(`[onSnapshot] Raw Firestore data for room ${roomCode}:`, data);
+             // Explicitly handle potential undefined or incorrect types from Firestore
+             const validatedData: GameState = {
+                 roomCode: roomCode, // Add roomCode back
+                 question: data.question ?? 'Error loading question',
+                 answer: typeof data.answer === 'number' ? data.answer : 0,
+                 players: Array.isArray(data.players) ? data.players.map(p => ({ // Validate players array and structure
+                      id: p?.id ?? '',
+                      name: p?.name ?? 'Unknown',
+                      score: typeof p?.score === 'number' ? p?.score : 0,
+                      isHost: typeof p?.isHost === 'boolean' ? p?.isHost : false,
+                      hasAnswered: typeof p?.hasAnswered === 'boolean' ? p?.hasAnswered : false,
+                      isCorrect: typeof p?.isCorrect === 'boolean' ? p?.isCorrect : null, // Default to null if missing/invalid
+                 })).filter(p => p.id) : [], // Filter out players with missing IDs
+                 timeLeft: typeof data.timeLeft === 'number' ? data.timeLeft : 0,
+                 isGameActive: typeof data.isGameActive === 'boolean' ? data.isGameActive : false,
+                 currentRound: typeof data.currentRound === 'number' ? data.currentRound : 0,
+                 roundStartTime: data.roundStartTime instanceof Timestamp ? data.roundStartTime : null, // Expect Timestamp or null
+                 createdAt: data.createdAt instanceof Timestamp ? data.createdAt : undefined,
+             };
+            // console.log(`[onSnapshot] Validated game state for room ${roomCode}:`, validatedData);
+
+            setGameState(validatedData); // Update local state with validated Firestore data + roomCode
             setIsLoading(false); // Mark loading as complete once data is received
 
             // Determine if the current user needs to join (enter name)
             // This check needs to happen *after* game state is loaded
              const playerInfo = getPlayerInfo(); // Get current info again
-            if (playerInfo && data.players.some(p => p.id === playerInfo.playerId)) {
-                 console.log(`[onSnapshot] Player ${playerInfo.playerId} already in game state. Setting isJoining=false.`);
-                 setLocalPlayerInfo(playerInfo); // Ensure local player info is set correctly
-                setIsJoining(false); // Player is already part of the game
+             // Check if playerInfo exists AND if a player with that ID is in the validated game state
+            if (playerInfo && validatedData.players.some(p => p.id === playerInfo.playerId)) {
+                 // console.log(`[onSnapshot] Player ${playerInfo.playerId} already in game state. Setting isJoining=false.`);
+                 // Ensure local player info is set correctly if not already
+                 if (!localPlayerInfo || localPlayerInfo.playerId !== playerInfo.playerId) {
+                    setLocalPlayerInfo(playerInfo);
+                 }
+                 setIsJoining(false); // Player is already part of the game
             } else {
-                console.log(`[onSnapshot] Player not found in game state or no player info stored. Setting isJoining=true.`);
+                // console.log(`[onSnapshot] Player not found in game state or no player info stored. Setting isJoining=true.`);
                 setIsJoining(true); // Player needs to enter their name
-                // If player info exists but they aren't in the game, clear it.
-                if(playerInfo && !data.players.some(p => p.id === playerInfo.playerId)) {
+                // If player info exists locally but they aren't in the game state (e.g., got removed), clear local info.
+                if(playerInfo && !validatedData.players.some(p => p.id === playerInfo.playerId)) {
+                    console.warn(`[onSnapshot] Local player ${playerInfo.playerId} exists but not in Firestore state for room ${roomCode}. Clearing local info.`);
                     clearPlayerInfo();
+                    setLocalPlayerInfo(null);
+                } else if (!playerInfo) {
+                    // No local info, definitely need to join
                     setLocalPlayerInfo(null);
                 }
             }
@@ -219,14 +261,19 @@ const GameRoomPage: NextPage = () => {
             roundEndTimeoutRef.current = null;
         }
     };
-  }, [roomCode, router, toast]); // Dependencies: roomCode, router, toast
+    // Add localPlayerInfo to dependency array? Maybe not, could cause loop if set inside. Check carefully.
+  }, [roomCode, router, toast]);
 
 
   // --- Game Actions (triggered by host or timer) ---
 
    const startGame = useCallback(async () => {
-       // Guard clauses
-       if (!gameState || gameState.isGameActive || !isHost || !gameState.players || gameState.players.length === 0) return;
+       // Guard clauses: Ensure gameState, player exists, is host, game not active, players exist
+       if (!gameState || !localPlayerInfo || !isHost || gameState.isGameActive || !gameState.players || gameState.players.length === 0) {
+            console.log(`[startGame] Aborted: gameState=${!!gameState}, localPlayerInfo=${!!localPlayerInfo}, isHost=${isHost}, isGameActive=${gameState?.isGameActive}, players=${gameState?.players?.length}`);
+            return;
+       }
+
 
        console.log(`[startGame] Host (${localPlayerInfo?.playerId}) starting game in room ${roomCode}...`);
        const { question, answer } = generateEquation();
@@ -234,9 +281,9 @@ const GameRoomPage: NextPage = () => {
        // Reset player statuses for the new game
         const resetPlayers = gameState.players.map(p => ({
            ...p,
+           score: 0, // Reset score for a completely new game
            hasAnswered: false,
-           isCorrect: undefined,
-           // score: 0 // Reset score if starting a completely new game, keep if just first round
+           isCorrect: null, // Reset correctness to null
        }));
 
        const newState: Partial<GameState> = {
@@ -249,13 +296,13 @@ const GameRoomPage: NextPage = () => {
            roundStartTime: serverTimestamp(), // Use Firestore server timestamp
        };
        await updateFirestoreState(newState);
-   }, [gameState, isHost, updateFirestoreState, roomCode, localPlayerInfo?.playerId]);
+   }, [gameState, isHost, updateFirestoreState, roomCode, localPlayerInfo]); // Added localPlayerInfo dependency
 
 
    const nextQuestion = useCallback(async () => {
-       // Guard clauses: Only host advances, only if game is active
-       if (!gameState || !gameState.isGameActive || !isHost) {
-            console.log(`[nextQuestion] Aborted: gameState=${!!gameState}, isGameActive=${gameState?.isGameActive}, isHost=${isHost}`);
+       // Guard clauses: Ensure gameState, player exists, is host, game is active
+       if (!gameState || !localPlayerInfo || !isHost || !gameState.isGameActive) {
+            console.log(`[nextQuestion] Aborted: gameState=${!!gameState}, localPlayerInfo=${!!localPlayerInfo}, isHost=${isHost}, isGameActive=${gameState?.isGameActive}`);
             return;
        }
        console.log(`[nextQuestion] Host (${localPlayerInfo?.playerId}) advancing to next question in room ${roomCode}...`);
@@ -274,7 +321,7 @@ const GameRoomPage: NextPage = () => {
        const resetPlayers = gameState.players.map(p => ({
            ...p,
            hasAnswered: false,
-           isCorrect: undefined,
+           isCorrect: null, // Reset correctness to null
        }));
 
        const newState: Partial<GameState> = {
@@ -288,19 +335,18 @@ const GameRoomPage: NextPage = () => {
        };
        await updateFirestoreState(newState);
        setCurrentAnswer(''); // Clear input field for the new question (locally for current player)
-   }, [gameState, isHost, updateFirestoreState, roomCode, localPlayerInfo?.playerId]);
+   }, [gameState, isHost, updateFirestoreState, roomCode, localPlayerInfo]); // Added localPlayerInfo dependency
 
 
   const endRound = useCallback(async () => {
-      // Guard clauses: Prevent multiple triggers, only host ends, game must be active
-      if (!gameState || !isHost || isRoundEnding || !gameState.isGameActive) {
-          console.log(`[endRound] Aborted: gameState=${!!gameState}, isHost=${isHost}, isRoundEnding=${isRoundEnding}, isGameActive=${gameState?.isGameActive}`);
+      // Guard clauses: Ensure gameState, player exists, is host, game active, not already ending
+      if (!gameState || !localPlayerInfo || !isHost || isRoundEnding || !gameState.isGameActive) {
+          console.log(`[endRound] Aborted: gameState=${!!gameState}, localPlayerInfo=${!!localPlayerInfo}, isHost=${isHost}, isRoundEnding=${isRoundEnding}, isGameActive=${gameState?.isGameActive}`);
           return;
       }
       console.log(`[endRound] Host (${localPlayerInfo?.playerId}) ending round ${gameState.currentRound} in room ${roomCode} - revealing results...`);
       setIsRoundEnding(true); // Set flag immediately to prevent race conditions
 
-      // Mark unanswered as incorrect and finalize round scores (server-side ideally, but client ok for this demo)
       // Fetch the latest state directly before update to avoid stale data race conditions
        const roomDocRef = doc(db, 'gameRooms', roomCode);
        try {
@@ -320,26 +366,26 @@ const GameRoomPage: NextPage = () => {
 
            const updatedPlayers = currentState.players.map(p => ({
                ...p,
-               isCorrect: p.hasAnswered ? p.isCorrect : false, // Mark unanswered as incorrect
+               // Mark unanswered as incorrect (false). If answered, keep their calculated isCorrect value.
+               isCorrect: p.hasAnswered ? p.isCorrect : false,
            }));
 
            const newState: Partial<GameState> = {
                players: updatedPlayers,
                timeLeft: 0, // Explicitly set time to 0
-               // isGameActive: false, // Consider setting to false only after results display? Or keep true until explicit end?
-                                    // Let's keep it true for now, nextQuestion handles transition
+               // Keep isGameActive true; nextQuestion handles transition
            };
 
             console.log(`[endRound] Updating Firestore state for results display:`, newState);
-           await updateFirestoreState(newState);
+           await updateFirestoreState(newState); // Use the shared update function
 
            // Schedule the next question after the results display duration
            if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current); // Clear existing timeout if any
            console.log(`[endRound] Scheduling next question trigger in ${RESULTS_DISPLAY_DURATION}ms.`);
            roundEndTimeoutRef.current = setTimeout(() => {
                console.log(`[endRound] Results display timer finished for round ${currentState.currentRound}. Triggering next question.`);
-               // Ensure nextQuestion uses the latest state if it changed during the timeout? Firestore listener handles this.
-                setIsRoundEnding(false); // Reset flag BEFORE calling nextQuestion
+               // Firestore listener updates gameState, so nextQuestion should have latest state.
+               setIsRoundEnding(false); // Reset flag BEFORE calling nextQuestion
                nextQuestion(); // Host triggers the next question
            }, RESULTS_DISPLAY_DURATION);
 
@@ -353,7 +399,7 @@ const GameRoomPage: NextPage = () => {
             });
        }
 
-  }, [gameState, isHost, isRoundEnding, updateFirestoreState, nextQuestion, roomCode, localPlayerInfo?.playerId, toast]);
+  }, [gameState, isHost, isRoundEnding, updateFirestoreState, nextQuestion, roomCode, localPlayerInfo, toast]); // Added localPlayerInfo dependency
 
 
   // Timer Check Logic - simplified for Firestore
@@ -381,6 +427,7 @@ const GameRoomPage: NextPage = () => {
     // Cleanup function
     return () => clearInterval(checkIntervalId);
 
+    // Include localPlayerInfo in dependencies if used inside checkTimeUp (it is, for logging)
   }, [isHost, gameState, isRoundEnding, endRound, calculateRoundTimeLeft, localPlayerInfo?.playerId]);
 
 
@@ -414,7 +461,7 @@ const GameRoomPage: NextPage = () => {
           score: 0,
           isHost: shouldBeHost,
           hasAnswered: false, // Initialize answer status
-          isCorrect: undefined
+          isCorrect: null // Initialize correctness to null, not undefined
       };
 
       // Save player info to sessionStorage FIRST
@@ -426,7 +473,7 @@ const GameRoomPage: NextPage = () => {
       // Update Firestore using arrayUnion
       const roomDocRef = doc(db, 'gameRooms', roomCode);
       try {
-          console.log(`[handleJoinGame] Updating Firestore: Adding player ${playerId} to room ${roomCode}`);
+          console.log(`[handleJoinGame] Updating Firestore: Adding player ${JSON.stringify(newPlayer)} to room ${roomCode}`);
            // If this player IS the host, we might need to ensure no one else is host.
            // This is complex with arrayUnion. It's safer to fetch and write if host logic is critical.
            // For this app, we assume the `isInitiallyHost && players.length === 0` check is sufficient.
@@ -470,6 +517,17 @@ const GameRoomPage: NextPage = () => {
       console.log(`[handleAnswerSubmit] Player ${localPlayerInfo.playerId} submitting answer: ${currentAnswer} for round ${gameState.currentRound}`);
 
       const submittedAnswer = parseInt(currentAnswer, 10);
+      // Handle NaN case from parseInt if input is invalid (e.g., just "-")
+      if (isNaN(submittedAnswer)) {
+          toast({
+              title: "Invalid Answer",
+              description: "Please enter a valid number.",
+              variant: "destructive",
+              duration: 2000,
+          });
+          return;
+      }
+
       const isAnswerCorrect = submittedAnswer === gameState.answer;
 
       // Calculate score based on remaining time (using the accurate server timestamp)
@@ -481,6 +539,7 @@ const GameRoomPage: NextPage = () => {
 
       const timeElapsed = Math.floor((Date.now() - startTimeMillis) / 1000);
       const timeTaken = Math.min(ROUND_DURATION, Math.max(0, timeElapsed)); // Clamp time
+      // More robust scoring: ensure positive score for correct, handle edge cases
       const scoreToAdd = isAnswerCorrect ? Math.max(5, (ROUND_DURATION - timeTaken) * 2 + 10) : 0; // Example scoring
 
       console.log(`[handleAnswerSubmit] Player ${localPlayerInfo.playerId} - Correct: ${isAnswerCorrect}, ScoreToAdd: ${scoreToAdd}, TimeTaken: ${timeTaken}s`);
@@ -495,22 +554,32 @@ const GameRoomPage: NextPage = () => {
 
        // Update Firestore: Find the player and update their score, hasAnswered, isCorrect
        // This requires reading the current array, modifying it, and writing it back.
-       // Using a transaction is safer for score updates, but for simplicity:
+       // Using a transaction is safer for score updates, but requires more setup.
+       // Read-modify-write approach (less safe with high concurrency):
        const roomDocRef = doc(db, 'gameRooms', roomCode);
        try {
-             // Get current players array
+             // Get current players array directly from Firestore to minimize race condition
              const currentDoc = await getDoc(roomDocRef);
              if (!currentDoc.exists()) throw new Error("Room document not found during answer submit");
-             const currentPlayers = (currentDoc.data() as GameState).players;
+              // Ensure players array exists and is an array
+             const currentPlayers = (currentDoc.data() as GameState)?.players;
+             if (!Array.isArray(currentPlayers)) {
+                 throw new Error("Players data is missing or not an array in Firestore during answer submit");
+             }
 
               // Find and update the specific player
               const updatedPlayers = currentPlayers.map(p =>
                  p.id === localPlayerInfo.playerId
-                 ? { ...p, score: p.score + scoreToAdd, hasAnswered: true, isCorrect: isAnswerCorrect }
+                 ? {
+                     ...p,
+                     score: (p.score ?? 0) + scoreToAdd, // Ensure score is treated as number
+                     hasAnswered: true,
+                     isCorrect: isAnswerCorrect // Set correctness based on calculation
+                    }
                  : p
               );
 
-              console.log(`[handleAnswerSubmit] Updating Firestore players array for player ${localPlayerInfo.playerId}`);
+              console.log(`[handleAnswerSubmit] Updating Firestore players array for player ${localPlayerInfo.playerId}. New array:`, updatedPlayers);
               await updateDoc(roomDocRef, { players: updatedPlayers });
               console.log(`[handleAnswerSubmit] Firestore update successful for player ${localPlayerInfo.playerId}`);
 
@@ -562,6 +631,12 @@ const GameRoomPage: NextPage = () => {
               return;
           }
           const currentState = currentDoc.data() as GameState;
+           if (!Array.isArray(currentState?.players)) {
+               console.warn(`[handleLeaveGame] Players data missing or invalid in room ${roomCode}. Navigating home.`);
+                router.push('/'); // Can't process leave without player data
+                return;
+           }
+
           const leavingPlayer = currentState.players.find(p => p.id === leavingPlayerId);
 
           if (!leavingPlayer) {
@@ -581,30 +656,42 @@ const GameRoomPage: NextPage = () => {
               let newHostAssigned = false;
               if (wasHost) {
                   // Host leaving, assign new host (e.g., first remaining player)
-                  const newHost = remainingPlayers[0];
-                  console.log(`[handleLeaveGame] Host (${leavingPlayerId}) leaving. Assigning new host: ${newHost.id} (${newHost.name}).`);
-                  // Create a new array with the updated host status
-                   const playersWithNewHost = remainingPlayers.map((p, index) =>
-                      index === 0 ? { ...p, isHost: true } : { ...p, isHost: false } // Ensure only one host
-                  );
-                   batch.update(roomDocRef, { players: playersWithNewHost });
-                   newHostAssigned = true;
+                  // Ensure there are remaining players before accessing [0]
+                  if (remainingPlayers.length > 0) {
+                      const newHost = remainingPlayers[0];
+                      console.log(`[handleLeaveGame] Host (${leavingPlayerId}) leaving. Assigning new host: ${newHost.id} (${newHost.name}).`);
+                      // Create a new array with the updated host status
+                       const playersWithNewHost = remainingPlayers.map((p, index) =>
+                          index === 0 ? { ...p, isHost: true } : { ...p, isHost: false } // Ensure only one host
+                      );
+                       batch.update(roomDocRef, { players: playersWithNewHost });
+                       newHostAssigned = true;
+                   } else {
+                        // This case should be covered by the remainingPlayers.length === 0 check above,
+                        // but adding safety log here.
+                         console.warn(`[handleLeaveGame] Host was leaving, but remainingPlayers array is unexpectedly empty. Deleting room.`);
+                        batch.delete(roomDocRef); // Delete if host leaves and somehow no one is left
+                   }
               } else {
                   // Non-host leaving, just update the players array
                    console.log(`[handleLeaveGame] Non-host player (${leavingPlayerId}) leaving room ${roomCode}.`);
                   batch.update(roomDocRef, { players: remainingPlayers }); // Update with filtered list
               }
-               // Commit the batch write (either delete or update)
-               await batch.commit();
-               console.log(`[handleLeaveGame] Firestore batch commit successful for player ${leavingPlayerId} leaving.`);
-               if (newHostAssigned) {
-                   // Toast locally about host change - other clients will see via listener
-                   const newHost = remainingPlayers.find(p => p.isHost);
-                   if (newHost) {
-                      toast({ title: "Host Changed", description: `${newHost.name} is the new host.`});
-                   }
-               }
           }
+             // Commit the batch write (either delete or update)
+             await batch.commit();
+             console.log(`[handleLeaveGame] Firestore batch commit successful for player ${leavingPlayerId} leaving.`);
+             // This section for host change toast is problematic as the leaving client won't see it.
+             // The new host/other clients will see the change via the listener.
+             /*
+             if (newHostAssigned) {
+                 // Toast locally about host change - other clients will see via listener
+                 const newHost = remainingPlayers.find(p => p.isHost);
+                 if (newHost) {
+                    toast({ title: "Host Changed", description: `${newHost.name} is the new host.`});
+                 }
+             }
+             */
 
 
       } catch (error) {
@@ -617,7 +704,7 @@ const GameRoomPage: NextPage = () => {
           });
       } finally {
             // Always navigate home after attempting to leave
-            toast({ title: `You left the room.` });
+            toast({ title: `You left the room "${leavingPlayerName || 'Player'}".` });
             router.push('/');
       }
   };
@@ -651,8 +738,13 @@ const GameRoomPage: NextPage = () => {
       return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading Room...</span></div>;
   }
 
-  // Join Screen (if player hasn't entered name yet)
-  if (isJoining) {
+  // Join Screen (if player hasn't entered name yet OR if gameState indicates they need to join again)
+  if (isJoining || !localPlayerInfo || (gameState && !gameState.players.some(p => p.id === localPlayerInfo?.playerId))) {
+     // Add a check to ensure we don't show join screen if game state hasn't loaded yet
+     if (!gameState) {
+        return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Initializing...</span></div>;
+     }
+
     return (
       <Card className="w-full max-w-md shadow-lg m-auto">
         <CardHeader>
@@ -680,14 +772,14 @@ const GameRoomPage: NextPage = () => {
   }
 
 
-  // Error state if game state or player info is missing after loading/joining attempt
-  if (!gameState || !localPlayerInfo) {
-     console.error("Render error: Game state or player info missing after loading/joining phase.");
-     // This might indicate the listener failed or the player couldn't join properly.
+  // Error state if game state is missing after loading/joining attempt but player info exists
+  // This state should ideally not be reached if listener/joining works correctly.
+  if (!gameState && localPlayerInfo) {
+     console.error("Render error: Game state missing but player info exists after loading/joining phase.");
      // Use useEffect to avoid calling router during render
      useEffect(() => {
         const timer = setTimeout(() => {
-           console.log("Redirecting home due to missing game/player state.");
+           console.log("Redirecting home due to missing game state.");
             clearPlayerInfo(); // Ensure cleanup before redirect
            router.push('/');
         }, 3000);
@@ -697,14 +789,30 @@ const GameRoomPage: NextPage = () => {
      return (
          <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
             <XCircle className="h-12 w-12 text-destructive mb-4" />
-            <h1 className="text-2xl font-semibold text-destructive mb-2">Error Loading Game</h1>
-            <p className="text-muted-foreground">Could not load required game or player data. You will be redirected home shortly.</p>
+            <h1 className="text-2xl font-semibold text-destructive mb-2">Error Loading Game Data</h1>
+            <p className="text-muted-foreground">Could not load game data. You will be redirected home shortly.</p>
             <Button onClick={() => { clearPlayerInfo(); router.push('/'); }} variant="outline" className="mt-4">Go Home Now</Button>
          </div>
      );
   }
 
-  // Main Game Screen
+  // Main Game Screen Render (requires gameState and localPlayerInfo to be present)
+  if (!gameState || !localPlayerInfo) {
+      // This should theoretically not be hit if the above checks work, but acts as a final safety net.
+      console.error("Critical Render Error: Game state or local player info is unexpectedly null/undefined.");
+       useEffect(() => {
+          const timer = setTimeout(() => {
+             console.log("Redirecting home due to critical render state error.");
+              clearPlayerInfo(); // Ensure cleanup before redirect
+             router.push('/');
+          }, 3000);
+          return () => clearTimeout(timer); // Cleanup timeout
+       }, [router]);
+      return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-destructive" /> <span className="ml-2 text-destructive">Critical Error - Redirecting...</span></div>;
+  }
+
+
+  // == Main Game Screen ==
   return (
     <div className="flex flex-col h-screen max-h-screen w-full max-w-md bg-secondary">
 
@@ -765,32 +873,35 @@ const GameRoomPage: NextPage = () => {
                                 <AvatarImage src={`https://avatar.vercel.sh/${encodeURIComponent(player.name)}.png?size=24`} alt={player.name} />
                                 <AvatarFallback>{player.name.substring(0, 1).toUpperCase()}</AvatarFallback>
                               </Avatar>
-                              <span className="truncate flex-1 min-w-0">{player.name} {player.isHost ? <span className="text-xs text-primary/80">(Host)</span> : ''}</span>
+                              {/* Ensure player.name is defined before accessing */}
+                              <span className="truncate flex-1 min-w-0">{player.name ?? 'Loading...'} {player.isHost ? <span className="text-xs text-primary/80">(Host)</span> : ''}</span>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                                 {/* Status Indicator: Show during active rounds or result phase */}
-                                {(gameState.isGameActive || isRoundEnding) && player.hasAnswered !== undefined && (
+                                {(gameState.isGameActive || isRoundEnding) && player.hasAnswered !== undefined && ( // Check hasAnswered is not undefined
                                      player.hasAnswered ? (
                                          // If round ended or time is up, show correct/incorrect
-                                         (isRoundEnding || roundTimeLeft <= 0) ? ( // Check <= 0 for safety
+                                         (isRoundEnding || (roundTimeLeft <= 0 && gameState.roundStartTime)) ? ( // Check round end OR time up (with start time)
                                              player.isCorrect === true ? // Explicit boolean check
                                                 <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" title="Correct"/> :
-                                                player.isCorrect === false ? // Explicit boolean check
+                                                player.isCorrect === false ? // Explicit boolean check (covers null/undefined indirectly if logic above is correct)
                                                 <XCircle className="h-4 w-4 text-destructive flex-shrink-0" title="Incorrect"/> :
-                                                 <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" title="Answered (Pending)" /> // Should ideally not happen if round ended
+                                                // Fallback if isCorrect is somehow still null/undefined after round end
+                                                <XCircle className="h-4 w-4 text-muted-foreground opacity-60 flex-shrink-0" title="Result Pending/Error" />
                                          ) : (
                                              // Answered, but round still active
                                              <Clock className="h-4 w-4 text-muted-foreground animate-pulse flex-shrink-0" title="Answered" />
                                          )
                                      ) : (
                                           // Player hasn't answered yet
-                                         (isRoundEnding || roundTimeLeft <= 0) ? // Check <= 0 for safety
+                                         (isRoundEnding || (roundTimeLeft <= 0 && gameState.roundStartTime)) ? // Check round end OR time up
                                             // Round ended, didn't answer
                                             <XCircle className="h-4 w-4 text-muted-foreground opacity-50 flex-shrink-0" title="Did not answer"/> :
                                             null // Round active, not answered - show nothing
                                      )
                                 )}
-                                <span className="font-mono font-semibold w-10 text-right flex-shrink-0">{player.score}</span>
+                                {/* Ensure player.score is defined before accessing */}
+                                <span className="font-mono font-semibold w-10 text-right flex-shrink-0">{player.score ?? 0}</span>
                           </div>
                        </div>
                     )) : (
@@ -810,8 +921,8 @@ const GameRoomPage: NextPage = () => {
                     <Card className="w-full bg-card shadow-lg text-center p-6">
                         <CardDescription className="mb-2">Question {gameState.currentRound}</CardDescription>
                         <CardTitle className="text-4xl font-mono tracking-wider">
-                            {/* Show answer ONLY if round ended or time is 0 */}
-                           {(isRoundEnding || roundTimeLeft <= 0) ? `${gameState.question} = ${gameState.answer}` : `${gameState.question} = ?`}
+                            {/* Show answer ONLY if round ended or time is 0 (and round started) */}
+                           {(isRoundEnding || (roundTimeLeft <= 0 && gameState.roundStartTime)) ? `${gameState.question} = ${gameState.answer}` : `${gameState.question} = ?`}
                         </CardTitle>
                     </Card>
 
@@ -826,17 +937,17 @@ const GameRoomPage: NextPage = () => {
                             onChange={(e) => setCurrentAnswer(e.target.value.replace(/[^0-9-]/g, ''))}
                             className="text-center text-2xl h-14"
                             // Disable if player has answered, time is up, or in results display phase
-                            disabled={hasPlayerAnswered || roundTimeLeft <= 0 || isRoundEnding}
+                            disabled={hasPlayerAnswered || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
                             aria-label="Enter your answer"
-                            aria-disabled={hasPlayerAnswered || roundTimeLeft <= 0 || isRoundEnding}
+                            aria-disabled={hasPlayerAnswered || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
                             autoFocus // Keep focus here when question appears
                         />
                         <Button
                             type="submit"
                             className="w-full text-lg py-3"
                             // Disable if answered, no input, time is up, or in results display phase
-                            disabled={hasPlayerAnswered || currentAnswer === '' || roundTimeLeft <= 0 || isRoundEnding}
-                            aria-disabled={hasPlayerAnswered || currentAnswer === '' || roundTimeLeft <= 0 || isRoundEnding}
+                            disabled={hasPlayerAnswered || currentAnswer === '' || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
+                            aria-disabled={hasPlayerAnswered || currentAnswer === '' || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
                          >
                              {/* Clearer button text based on state */}
                             {hasPlayerAnswered ? 'Answer Submitted' : 'Submit Answer'}
@@ -879,10 +990,15 @@ const GameRoomPage: NextPage = () => {
                           <>
                             <CardTitle className="text-xl mb-4">Waiting for players<span className="animate-pulse">...</span></CardTitle>
                             <Loader2 className="h-6 w-6 animate-spin text-primary mb-4"/>
+                            <CardDescription className="mt-2 text-xs text-muted-foreground">
+                                Share the Room Code or Link below!
+                            </CardDescription>
                           </>
                      )}
                       <CardDescription className="mt-4 text-xs text-muted-foreground">
-                        Share the Room Code: <strong className="text-foreground">{roomCode}</strong> or copy the link!
+                        Room Code: <strong className="text-foreground">{roomCode}</strong>
+                        <Button variant="link" size="sm" onClick={handleCopyCode} className="p-1 h-auto ml-1">Copy Code</Button>
+                        <Button variant="link" size="sm" onClick={handleCopyLink} className="p-1 h-auto ml-1">Copy Link</Button>
                       </CardDescription>
                  </Card>
             )}
