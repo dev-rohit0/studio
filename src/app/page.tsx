@@ -39,20 +39,38 @@ const HomePage: NextPage = () => {
 
     // Basic initial game state for Firestore
     // Omit 'roomCode' as it's the document ID itself
+    // Add explicit null check for roundStartTime for clarity
     const initialGameState: Omit<GameState, 'roomCode'> & { createdAt: any } = {
         question: 'Waiting for host to start...',
-        answer: 0,
-        players: [], // Host will join in the room page
+        answer: 0, // Ensure answer is a number
+        players: [], // Start with an empty player array
         timeLeft: 0, // Initial time, will be set when round starts
         isGameActive: false,
         currentRound: 0,
-        roundStartTime: null, // Set when round starts
+        roundStartTime: null, // Explicitly null initially
         createdAt: serverTimestamp(), // Add a creation timestamp
     };
 
     try {
+      // Ensure db is initialized before using it
+      if (!db) {
+        console.error("[CreateRoom] Firestore database instance is not available.");
+        toast({
+          title: 'Error Creating Room',
+          description: 'Database connection failed. Please try again later.',
+          variant: 'destructive',
+        });
+        setIsCreatingRoom(false);
+        return;
+      }
+
       const roomDocRef = doc(db, 'gameRooms', newRoomCode);
-      console.log(`[CreateRoom] Attempting to create Firestore document: gameRooms/${newRoomCode} with data:`, initialGameState);
+      console.log(`[CreateRoom] Attempting to create Firestore document at path: ${roomDocRef.path}`);
+      console.log(`[CreateRoom] Data to be written:`, JSON.parse(JSON.stringify(initialGameState, (key, value) => // Use JSON stringify to handle potential non-serializable values in log
+        typeof value === 'undefined' ? 'undefined_value' : value
+      )));
+
+      // Perform the Firestore write operation
       await setDoc(roomDocRef, initialGameState);
       console.log(`[CreateRoom] Successfully created Firestore document for room: ${newRoomCode}`);
 
@@ -61,11 +79,22 @@ const HomePage: NextPage = () => {
       router.push(`/room/${newRoomCode}?host=true`);
       // State will reset on navigation, no need to set isCreatingRoom false here
 
-    } catch (error) {
+    } catch (error: any) { // Catch specific error type if possible, otherwise use any
       console.error(`[CreateRoom] Error creating Firestore document for room ${newRoomCode}:`, error);
+      // Provide more specific error feedback if possible
+      let description = 'Could not create the game room. Please check connection or permissions and try again.';
+      if (error.code === 'permission-denied') {
+          description = 'Permission denied. Check Firestore rules.';
+      } else if (error.message?.includes('offline')) {
+           description = 'Network error. Please check your internet connection.';
+      } else if (error.message?.includes('INVALID_ARGUMENT')) {
+            description = 'Invalid data sent to the server. Please contact support.';
+             console.error("[CreateRoom] Detailed error data:", error.details); // Log more details if available
+      }
+
       toast({
         title: 'Error Creating Room',
-        description: 'Could not create the game room. Please check connection or permissions and try again.', // Added detail
+        description: description,
         variant: 'destructive',
       });
       setIsCreatingRoom(false); // Explicitly reset state on error
@@ -88,6 +117,18 @@ const HomePage: NextPage = () => {
     console.log(`[JoinRoom] Attempting to join room with code: ${codeToJoin}`);
 
     try {
+        // Ensure db is initialized before using it
+        if (!db) {
+          console.error("[JoinRoom] Firestore database instance is not available.");
+          toast({
+            title: 'Error Joining Room',
+            description: 'Database connection failed. Please try again later.',
+            variant: 'destructive',
+          });
+          setIsJoiningRoom(false);
+          return;
+        }
+
         const roomDocRef = doc(db, 'gameRooms', codeToJoin);
         console.log(`[JoinRoom] Checking Firestore document: gameRooms/${codeToJoin}`);
         const docSnap = await getDoc(roomDocRef);
@@ -107,11 +148,17 @@ const HomePage: NextPage = () => {
             });
             setIsJoiningRoom(false); // Reset state on error
         }
-    } catch (error) {
+    } catch (error: any) { // Catch specific error type if possible
         console.error(`[JoinRoom] Error checking Firestore document for room ${codeToJoin}:`, error);
+         let description = 'Could not check if the room exists. Please check connection and try again.';
+          if (error.code === 'permission-denied') {
+              description = 'Permission denied. Check Firestore rules.';
+          } else if (error.message?.includes('offline')) {
+               description = 'Network error. Please check your internet connection.';
+          }
         toast({
             title: 'Error Joining Room',
-            description: 'Could not check if the room exists. Please check connection and try again.', // Added detail
+            description: description,
             variant: 'destructive',
         });
         setIsJoiningRoom(false); // Reset state on error
