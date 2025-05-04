@@ -43,6 +43,11 @@ const HomePage: NextPage = () => {
 
     // Save the initial state to localStorage
     saveGameState(newRoomCode, initialGameState);
+    console.log(`[CreateRoom] Saved initial game state for room: ${newRoomCode}`, initialGameState);
+    // Verify save
+    const verifyState = getGameState(newRoomCode);
+    console.log(`[CreateRoom] Verified saved state for room ${newRoomCode}:`, verifyState);
+
 
     console.log(`Creating room with code: ${newRoomCode}`);
     // Redirect to the room, the host will join there
@@ -60,20 +65,24 @@ const HomePage: NextPage = () => {
       return;
     }
 
+    console.log(`[JoinRoom] Attempting to join room with code: ${codeToJoin}`);
     // Check if the room exists in localStorage
     const existingGameState = getGameState(codeToJoin);
+    console.log(`[JoinRoom] Result of getGameState for ${codeToJoin}:`, existingGameState);
+
 
     if (!existingGameState) {
+      console.error(`[JoinRoom] Room ${codeToJoin} not found in localStorage.`);
       toast({
         title: 'Room Not Found',
-        description: `Could not find a game room with code ${codeToJoin}.`,
+        description: `Could not find a game room with code ${codeToJoin}. Please double-check the code.`,
         variant: 'destructive',
       });
       return;
     }
 
     // Room exists, navigate to it
-    console.log(`Joining room with code: ${codeToJoin}`);
+    console.log(`[JoinRoom] Room ${codeToJoin} found. Navigating...`);
     router.push(`/room/${codeToJoin}`);
   };
 
