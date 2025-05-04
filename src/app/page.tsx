@@ -1,18 +1,26 @@
+// src/app/page.tsx
 'use client';
 
 import type { NextPage } from 'next';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Users, Link as LinkIcon } from 'lucide-react';
+import { Home, Users } from 'lucide-react';
+import { getGameState, saveGameState, generateId, clearPlayerInfo } from '@/lib/game-storage';
+import type { GameState, Player } from '@/types/game';
 
 const HomePage: NextPage = () => {
-  const [roomCode, setRoomCode] = useState('');
+  const [roomCodeInput, setRoomCodeInput] = useState('');
   const router = useRouter();
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Clear any lingering player info when returning to the home page
+    clearPlayerInfo();
+  }, []);
 
   const generateRoomCode = (): string => {
     // Simple 6-digit numeric code generation
@@ -21,13 +29,29 @@ const HomePage: NextPage = () => {
 
   const handleCreateRoom = () => {
     const newRoomCode = generateRoomCode();
-    // In a real app, you'd persist this room state server-side
+    // Basic initial game state - player joins on the next screen
+    const initialGameState: GameState = {
+        roomCode: newRoomCode,
+        question: 'Waiting for host to start...',
+        answer: 0,
+        players: [], // Host will join in the room page
+        timeLeft: 0,
+        isGameActive: false,
+        currentRound: 0,
+        roundStartTime: null,
+    };
+
+    // Save the initial state to localStorage
+    saveGameState(newRoomCode, initialGameState);
+
     console.log(`Creating room with code: ${newRoomCode}`);
-    router.push(`/room/${newRoomCode}`);
+    // Redirect to the room, the host will join there
+    router.push(`/room/${newRoomCode}?host=true`);
   };
 
   const handleJoinRoom = () => {
-    if (roomCode.trim() === '' || !/^\d{6}$/.test(roomCode)) {
+    const codeToJoin = roomCodeInput.trim();
+    if (!/^\d{6}$/.test(codeToJoin)) {
       toast({
         title: 'Invalid Room Code',
         description: 'Please enter a valid 6-digit room code.',
@@ -35,9 +59,22 @@ const HomePage: NextPage = () => {
       });
       return;
     }
-    // In a real app, you'd check if the room exists server-side
-    console.log(`Joining room with code: ${roomCode}`);
-    router.push(`/room/${roomCode}`);
+
+    // Check if the room exists in localStorage
+    const existingGameState = getGameState(codeToJoin);
+
+    if (!existingGameState) {
+      toast({
+        title: 'Room Not Found',
+        description: `Could not find a game room with code ${codeToJoin}.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Room exists, navigate to it
+    console.log(`Joining room with code: ${codeToJoin}`);
+    router.push(`/room/${codeToJoin}`);
   };
 
   return (
@@ -72,8 +109,8 @@ const HomePage: NextPage = () => {
             <Input
               type="text"
               placeholder="Enter 6-digit Room Code"
-              value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value.replace(/\D/g, '').slice(0, 6))} // Allow only 6 digits
+              value={roomCodeInput}
+              onChange={(e) => setRoomCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))} // Allow only 6 digits
               className="text-center text-lg tracking-widest"
               maxLength={6}
               pattern="\d{6}"
@@ -85,7 +122,7 @@ const HomePage: NextPage = () => {
               variant="secondary"
               className="w-full text-lg py-6"
               aria-label="Join an existing game room"
-              disabled={roomCode.length !== 6}
+              disabled={roomCodeInput.length !== 6}
             >
               <Users className="mr-2" /> Join Room
             </Button>
