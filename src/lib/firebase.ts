@@ -14,53 +14,75 @@ const firebaseConfig = {
 };
 
 // Log the configuration to verify environment variables are loaded
-console.log('[Firebase] Config loaded:', {
-    apiKey: firebaseConfig.apiKey ? '***' : 'MISSING', // Hide API key in logs
-    authDomain: firebaseConfig.authDomain,
-    projectId: firebaseConfig.projectId,
-    storageBucket: firebaseConfig.storageBucket,
-    messagingSenderId: firebaseConfig.messagingSenderId,
-    appId: firebaseConfig.appId ? '***' : 'MISSING', // Hide App ID in logs
-});
+// Avoid logging sensitive keys directly in production environments
+if (process.env.NODE_ENV === 'development') {
+    console.log('[Firebase] Config loaded:', {
+        apiKey: firebaseConfig.apiKey ? '***' : 'MISSING',
+        authDomain: firebaseConfig.authDomain || 'MISSING',
+        projectId: firebaseConfig.projectId || 'MISSING',
+        storageBucket: firebaseConfig.storageBucket || 'MISSING',
+        messagingSenderId: firebaseConfig.messagingSenderId || 'MISSING',
+        appId: firebaseConfig.appId ? '***' : 'MISSING',
+    });
+}
 
-// Check if the Project ID is missing or still the placeholder
+// Check if critical configuration values are missing or still placeholders
+let configError = false;
 if (!firebaseConfig.projectId || firebaseConfig.projectId === 'YOUR_PROJECT_ID') {
     console.error(
         '[Firebase] ERROR: Firebase Project ID is missing or not configured.' +
-        ' Please set NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable.' +
-        ' Firestore operations will likely fail.'
+        ' Please set NEXT_PUBLIC_FIREBASE_PROJECT_ID in your .env.local file with the correct value from your Firebase project settings.' +
+        ' Firestore operations will fail.'
     );
-    // Optionally throw an error to halt initialization if configuration is critical
-    // throw new Error("Firebase Project ID is not configured.");
+    configError = true;
 }
-
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'YOUR_API_KEY') {
+     console.error(
+        '[Firebase] ERROR: Firebase API Key is missing.' +
+        ' Please set NEXT_PUBLIC_FIREBASE_API_KEY in your .env.local file.'
+    );
+     configError = true;
+}
+// Add checks for other required keys if necessary, like authDomain, appId depending on usage.
 
 // Initialize Firebase
 let app;
-if (!getApps().length) {
-  try {
-    app = initializeApp(firebaseConfig);
-    console.log('[Firebase] Initialized successfully.');
-  } catch (error) {
-    console.error('[Firebase] Error initializing Firebase app:', error);
-    // Handle initialization error appropriately, maybe prevent app from fully loading
-  }
-} else {
-  app = getApp();
-  console.log('[Firebase] Using existing app instance.');
-}
-
-// Initialize Firestore only if app initialization was successful
 let db;
-if (app) {
-  try {
-    db = getFirestore(app);
-    console.log('[Firebase] Firestore instance created.');
-  } catch (error) {
-    console.error('[Firebase] Error getting Firestore instance:', error);
-  }
+
+// Prevent initialization errors in environments where Firebase might not be needed
+// or if running in contexts like server-side rendering without env vars available immediately.
+// Ensure this runs primarily client-side or in environments where env vars are guaranteed.
+if (typeof window !== 'undefined') { // Basic check if running in a browser context
+    if (!configError) {
+        if (!getApps().length) {
+          try {
+            app = initializeApp(firebaseConfig);
+            console.log('[Firebase] Initialized successfully.');
+          } catch (error) {
+            console.error('[Firebase] Error initializing Firebase app:', error);
+          }
+        } else {
+          app = getApp();
+          console.log('[Firebase] Using existing app instance.');
+        }
+
+        // Initialize Firestore only if app initialization was successful
+        if (app) {
+          try {
+            db = getFirestore(app);
+            console.log('[Firebase] Firestore instance created.');
+          } catch (error) {
+            console.error('[Firebase] Error getting Firestore instance:', error);
+          }
+        } else {
+            console.error('[Firebase] Cannot initialize Firestore because Firebase app failed to initialize.');
+        }
+    } else {
+        console.error('[Firebase] Firebase initialization skipped due to configuration errors. Please check your .env.local file and restart the server/build.');
+        // db will remain undefined, Firestore operations using it will fail safely later
+    }
 } else {
-    console.error('[Firebase] Cannot initialize Firestore because Firebase app failed to initialize.');
+    console.warn('[Firebase] Firebase initialization skipped. Not in a browser environment or environment variables might not be available yet.');
 }
 
 

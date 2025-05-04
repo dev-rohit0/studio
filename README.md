@@ -15,38 +15,42 @@ This is a Next.js application for a real-time multiplayer math game built with F
     ```
 3.  **Configure Firebase:**
     *   Create a Firebase project at [https://console.firebase.google.com/](https://console.firebase.google.com/).
-    *   Enable Firestore database in your project settings.
-    *   Go to Project Settings > General. Under "Your apps", add a web app.
-    *   Copy the `firebaseConfig` object provided.
-    *   Create a `.env.local` file in the root of your project (if it doesn't exist).
-    *   Add the following environment variables to your `.env.local` file, replacing the placeholder values with your actual Firebase config values:
+    *   Enable **Firestore Database** in your project settings (choose **Start in test mode** for initial development, but secure your rules for production).
+    *   Go to Project Settings > General. Under "Your apps", click the "</>" icon to add a web app.
+    *   Register your app. Give it a nickname (e.g., "Math Mania Web"). **Firebase Hosting is NOT required for this step.**
+    *   After registering, Firebase will show you a `firebaseConfig` object. Copy these values.
+    *   Create a file named `.env.local` in the **root** of your project directory (if it doesn't already exist).
+    *   Add the following environment variables to your `.env.local` file, **carefully replacing the placeholder values (`YOUR_...`) with your actual Firebase config values**:
 
         ```env
+        # --- IMPORTANT: REPLACE THESE VALUES ---
         NEXT_PUBLIC_FIREBASE_API_KEY=YOUR_API_KEY
         NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=YOUR_AUTH_DOMAIN
         NEXT_PUBLIC_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
         NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=YOUR_STORAGE_BUCKET
         NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=YOUR_MESSAGING_SENDER_ID
         NEXT_PUBLIC_FIREBASE_APP_ID=YOUR_APP_ID
+        # ---------------------------------------
         ```
-        **IMPORTANT:** Ensure your Project ID (`NEXT_PUBLIC_FIREBASE_PROJECT_ID`) is correctly set. The application will log an error and Firestore operations will fail if this is missing or incorrect.
+        **CRITICAL:** Ensure your Project ID (`NEXT_PUBLIC_FIREBASE_PROJECT_ID`) is correctly set. **Do not leave it as `YOUR_PROJECT_ID`.** If this value is missing or incorrect, the application will log an error, and Firestore operations (like creating or joining rooms) will fail, often with a "Bad Request" or similar network error pointing to Firestore.
 
     *   **Firestore Security Rules:** For development, you can start with open rules, but **ensure you secure these for production**:
-        *   Go to Firestore Database > Rules.
-        *   Use rules like this for initial testing (ALLOWS ANYONE TO READ/WRITE):
+        *   Go to your Firebase project: Build > Firestore Database > Rules.
+        *   Use rules like this for initial testing (ALLOWS ANYONE TO READ/WRITE - **INSECURE FOR PRODUCTION**):
             ```
             rules_version = '2';
             service cloud.firestore {
               match /databases/{database}/documents {
-                // Allow read/write access to all documents for now
+                // Allow read/write access to all documents for DEVELOPMENT ONLY
                 // WARNING: Secure this before deploying to production!
                 match /{document=**} {
                   allow read, write: if true;
+                  // For production, you might use: allow read, write: if request.auth != null;
                 }
               }
             }
             ```
-        *   For production, you'll need rules that restrict access based on authentication or specific logic.
+        *   Click **Publish**.
 
 4.  **Run the development server:**
     ```bash
@@ -56,6 +60,8 @@ This is a Next.js application for a real-time multiplayer math game built with F
     # or
     pnpm dev
     ```
+    **Note:** After creating or modifying `.env.local`, you **must restart** your development server (`npm run dev`) for the changes to take effect.
+
 5.  Open [http://localhost:9002](http://localhost:9002) (or your specified port) in your browser.
 
 ## How to Play
@@ -81,12 +87,12 @@ This is a Next.js application for a real-time multiplayer math game built with F
 *   `src/hooks/`: Custom React hooks.
 *   `src/lib/`: Utility functions and library configurations.
     *   `firebase.ts`: Firebase initialization and configuration.
-    *   `game-storage.ts`: Handles saving/retrieving player session info (like name/ID).
+    *   `game-storage.ts`: Handles saving/retrieving player session info (like name/ID) using `sessionStorage`.
     *   `utils.ts`: General utility functions (like `cn` for Tailwind).
 *   `src/types/`: TypeScript type definitions.
     *   `game.ts`: Defines `Player` and `GameState` interfaces.
 *   `public/`: Static assets.
-*   `.env.local`: Environment variables (Firebase config).
+*   `.env.local`: Environment variables (Firebase config - **MUST BE CONFIGURED CORRECTLY**).
 *   `next.config.ts`: Next.js configuration.
 *   `tsconfig.json`: TypeScript configuration.
 *   `tailwind.config.ts`: Tailwind CSS configuration.
@@ -100,3 +106,9 @@ This is a Next.js application for a real-time multiplayer math game built with F
 *   Tailwind CSS
 *   shadcn/ui (UI Components)
 *   Lucide React (Icons)
+
+## Troubleshooting
+
+*   **"Firebase Project ID is missing..." Error:** This means you haven't correctly configured your `.env.local` file. Double-check that the file exists in the project root, that the variable names start with `NEXT_PUBLIC_`, and that you've replaced `YOUR_PROJECT_ID` and other placeholders with your actual Firebase credentials. Remember to **restart the development server** after changing `.env.local`.
+*   **Creating/Joining Room Fails Silently or with Network Errors:** This is often caused by incorrect Firebase configuration (`.env.local`) or restrictive Firestore security rules. Verify your `.env.local` settings and ensure your Firestore rules allow writes (at least for development). Check the browser's developer console for more specific error messages from Firebase.
+*   **Firestore Permissions Errors:** If you see "permission denied" errors in the console, check your Firestore Security Rules in the Firebase console. Ensure they allow the necessary read/write operations for the `gameRooms` collection. For development, the open rules provided above should work.
