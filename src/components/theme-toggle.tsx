@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -26,13 +25,13 @@ export function ThemeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="rounded-2xl border-2 border-primary/10">
-        <DropdownMenuItem onClick={() => setTheme("light")} className="font-bold cursor-pointer rounded-xl">
+        <DropdownMenuItem onClick={() => setTheme("light")} className="font-bold cursor-pointer rounded-xl text-xs">
           Light
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")} className="font-bold cursor-pointer rounded-xl">
+        <DropdownMenuItem onClick={() => setTheme("dark")} className="font-bold cursor-pointer rounded-xl text-xs">
           Dark
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("system")} className="font-bold cursor-pointer rounded-xl">
+        <DropdownMenuItem onClick={() => setTheme("system")} className="font-bold cursor-pointer rounded-xl text-xs">
           System
         </DropdownMenuItem>
       </DropdownMenuContent>
