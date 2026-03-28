@@ -1,10 +1,8 @@
+
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import { Toaster } from "@/components/ui/toaster"; // Import Toaster
-// Removed QueryClientProvider as it's not directly used in the Firestore refactor
-// If you add features that use Tanstack Query later, you'll need to re-add it.
-// import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -17,11 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Math Mania', // Update title
-  description: 'Fastest finger math game', // Update description
+  title: 'MathPulse',
+  description: 'Fastest finger math game with real-time competition',
 };
-
-// const queryClient = new QueryClient(); // Removed instantiation
 
 export default function RootLayout({
   children,
@@ -31,12 +27,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {/* <QueryClientProvider client={queryClient}> */}
           <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-secondary">
             {children}
           </main>
-          <Toaster /> {/* Add Toaster component */}
-        {/* </QueryClientProvider> */}
+          <Toaster />
       </body>
     </html>
   );

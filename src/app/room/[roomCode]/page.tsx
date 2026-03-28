@@ -1,8 +1,10 @@
+
 'use client';
 
 import type { NextPage } from 'next';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -11,12 +13,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, XCircle, ClipboardCopy, Users, Share2, Clock, LogOut, Loader2, Plus, Trash2, BrainCircuit, Trophy, Medal, Award } from 'lucide-react';
+import { CheckCircle, XCircle, ClipboardCopy, Users, Share2, Clock, LogOut, Loader2, Plus, Trash2, Activity, Trophy, Medal, Award } from 'lucide-react';
 import { getPlayerInfo, savePlayerInfo, clearPlayerInfo, generateId } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
 import type { Player, GameState } from '@/types/game';
 import AdBanner from '@/components/ads/AdBanner';
+import placeholders from '@/app/lib/placeholder-images.json';
 
 const ROUND_DURATION = 30;
 const RESULTS_DISPLAY_DURATION = 3000;
@@ -37,8 +40,8 @@ const GameRoomPage: NextPage = () => {
   const [isJoining, setIsJoining] = useState(true);
   const [showScoreboard, setShowScoreboard] = useState(true);
   const [roundTimeLeft, setRoundTimeLeft] = useState(ROUND_DURATION);
+  const [logoError, setLogoError] = useState(false);
   
-  // Custom question form state
   const [newQ, setNewQ] = useState('');
   const [autoCalcAns, setAutoCalcAns] = useState<number | null>(null);
 
@@ -63,7 +66,6 @@ const GameRoomPage: NextPage = () => {
     setAutoCalcAns(ans);
   }, [newQ]);
 
-  // Local timer management
   useEffect(() => {
     if (gameState?.isGameActive && !gameState?.isGameOver && !gameState?.isShowingResults && gameState?.currentRound > 0) {
       const intervalId = setInterval(() => {
@@ -123,7 +125,7 @@ const GameRoomPage: NextPage = () => {
       try {
           await updateDoc(roomDocRef, updates);
       } catch (error) {
-          console.error(`[updateFirestoreState] Error updating Firestore:`, error);
+          console.error(error);
       }
   }, [roomCode]);
 
@@ -146,17 +148,13 @@ const GameRoomPage: NextPage = () => {
     unsubscribeRef.current = onSnapshot(roomDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data() as GameState;
-            
             setGameState(prev => {
-                // If a new round has started, force reset the local timer immediately
                 if (prev?.currentRound !== data.currentRound && data.isGameActive && !data.isShowingResults) {
                     setRoundTimeLeft(ROUND_DURATION);
                 }
                 return { ...data, roomCode };
             });
-            
             setIsLoading(false);
-
             const pInfo = getPlayerInfo();
             if (pInfo && data.players?.some(p => p.id === pInfo.playerId)) {
                 setIsJoining(false);
@@ -168,7 +166,6 @@ const GameRoomPage: NextPage = () => {
             router.push('/');
         }
     }, (error) => {
-        console.error(`[onSnapshot] Error:`, error);
         setIsLoading(false);
     });
 
@@ -180,7 +177,6 @@ const GameRoomPage: NextPage = () => {
 
   const handleAddCustomQuestion = async () => {
     if (!newQ.trim() || autoCalcAns === null || !gameState) return;
-
     const updatedQuestions = [...(gameState.customQuestions || []), { question: newQ, answer: autoCalcAns }];
     await updateFirestoreState({ customQuestions: updatedQuestions });
     setNewQ('');
@@ -243,7 +239,6 @@ const GameRoomPage: NextPage = () => {
 
   const nextQuestion = useCallback(async () => {
     if (!gameState || !isHost || !gameState.isGameActive) return;
-
     if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
 
     let nextQ: string;
@@ -306,7 +301,6 @@ const GameRoomPage: NextPage = () => {
     }, RESULTS_DISPLAY_DURATION);
   }, [gameState, isHost, updateFirestoreState, nextQuestion]);
 
-  // Host listener for timer and auto-advancing
   useEffect(() => {
     if (!isHost || !gameState?.isGameActive || gameState.isShowingResults || !gameState.players || gameState.players.length === 0) return;
     
@@ -314,12 +308,10 @@ const GameRoomPage: NextPage = () => {
     const allCorrect = allAnswered && gameState.players.every(p => p.isCorrect === true);
 
     if (allCorrect) {
-        // Everyone is right, advance quickly without showing results screen for 3s
         if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
         const autoAdvance = setTimeout(() => nextQuestion(), 1000);
         return () => clearTimeout(autoAdvance);
     } else if (allAnswered || roundTimeLeft <= 0) {
-        // Everyone answered (but someone is wrong) or time is up
         endRound();
     }
   }, [gameState?.players, isHost, gameState?.isGameActive, gameState?.isShowingResults, roundTimeLeft, nextQuestion, endRound]);
@@ -346,9 +338,8 @@ const GameRoomPage: NextPage = () => {
       const roomDocRef = doc(db, 'gameRooms', roomCode);
       try {
           await updateDoc(roomDocRef, { players: arrayUnion(newPlayer) });
-          toast({ title: `Welcome, ${name}!` });
+          toast({ title: `Welcome to MathPulse, ${name}!` });
       } catch (error) {
-          console.error(error);
           toast({ title: "Error Joining Game", variant: "destructive" });
       }
   };
@@ -367,12 +358,6 @@ const GameRoomPage: NextPage = () => {
       if (isAnswerCorrect) {
             scoreToAdd = Math.max(5, roundTimeLeft * 2 + 10);
       }
-
-      toast({
-        title: isAnswerCorrect ? 'Correct!' : 'Incorrect',
-        variant: isAnswerCorrect ? 'default' : 'destructive',
-        duration: 1500,
-      });
 
        const roomDocRef = doc(db, 'gameRooms', roomCode);
        try {
@@ -400,17 +385,14 @@ const GameRoomPage: NextPage = () => {
     if (!localPlayerInfo || !roomCode || !db) return;
     const leavingPlayerId = localPlayerInfo.playerId;
     const roomDocRef = doc(db, 'gameRooms', roomCode);
-
     clearPlayerInfo();
     setLocalPlayerInfo(null);
-
     try {
         await runTransaction(db, async (transaction) => {
             const docSnap = await transaction.get(roomDocRef);
             if (!docSnap.exists()) return;
             const data = docSnap.data() as GameState;
             const remainingPlayers = data.players.filter(p => p.id !== leavingPlayerId);
-
             if (remainingPlayers.length === 0) {
                 transaction.delete(roomDocRef);
             } else {
@@ -445,14 +427,19 @@ const GameRoomPage: NextPage = () => {
 
   if (isJoining || !localPlayerInfo || !gameState?.players.some(p => p.id === localPlayerInfo?.playerId)) {
     return (
-      <Card className="w-full max-w-md shadow-lg m-auto">
+      <Card className="w-full max-w-md shadow-lg m-auto border-none">
         <CardHeader>
+          <div className="flex justify-center mb-4">
+            {!logoError ? (
+                <Image src={placeholders.logo.url} alt={placeholders.logo.alt} width={100} height={30} className="object-contain" onError={() => setLogoError(true)} />
+            ) : <Activity className="h-10 w-10 text-primary" />}
+          </div>
           <CardTitle className="text-center">Join Room: {roomCode}</CardTitle>
-          <CardDescription className="text-center">Enter your name to join the challenge</CardDescription>
+          <CardDescription className="text-center">Enter your name to start the pulse</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-           <Input placeholder="Your Name" value={inputPlayerName} onChange={(e) => setInputPlayerName(e.target.value)} maxLength={15} onKeyDown={(e) => e.key === 'Enter' && handleJoinGame()} />
-           <Button onClick={handleJoinGame} className="w-full" disabled={!inputPlayerName.trim() || (gameState?.players.length ?? 0) >= 10}>Join Game</Button>
+           <Input placeholder="Your Name" value={inputPlayerName} onChange={(e) => setInputPlayerName(e.target.value)} maxLength={15} onKeyDown={(e) => e.key === 'Enter' && handleJoinGame()} className="h-12 rounded-xl text-lg" />
+           <Button onClick={handleJoinGame} className="w-full h-12 text-lg rounded-xl" disabled={!inputPlayerName.trim() || (gameState?.players.length ?? 0) >= 10}>Join Game</Button>
         </CardContent>
       </Card>
     );
@@ -466,7 +453,7 @@ const GameRoomPage: NextPage = () => {
           <CardHeader className="text-center pb-2">
             <Trophy className="h-16 w-16 text-yellow-500 mx-auto mb-2 animate-bounce" />
             <CardTitle className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-600 to-yellow-400">Final Results</CardTitle>
-            <CardDescription>Amazing performance by the top candidates!</CardDescription>
+            <CardDescription>MathPulse Champions!</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex justify-around items-end pt-8 pb-4">
@@ -522,9 +509,9 @@ const GameRoomPage: NextPage = () => {
           </CardContent>
           <CardFooter className="flex flex-col gap-2 pt-0">
              {isHost && (
-                <Button onClick={handleResetLobby} className="w-full">Return to Lobby</Button>
+                <Button onClick={handleResetLobby} className="w-full rounded-xl py-6 text-lg">Return to Lobby</Button>
              )}
-             <Button variant="outline" onClick={handleLeaveGame} className="w-full">Exit Room</Button>
+             <Button variant="outline" onClick={handleLeaveGame} className="w-full rounded-xl py-6 text-lg">Exit Room</Button>
           </CardFooter>
         </Card>
         <AdBanner className="mt-auto" />
@@ -534,16 +521,16 @@ const GameRoomPage: NextPage = () => {
 
   return (
     <div className="flex flex-col h-screen max-h-screen w-full max-w-md bg-secondary">
-        <Card className="m-2 shadow rounded-lg flex-shrink-0">
+        <Card className="m-2 shadow rounded-xl flex-shrink-0 border-none">
          <CardHeader className="p-3">
              <div className="flex justify-between items-center mb-2">
-                 <CardTitle className="text-xl flex items-center gap-1">
-                     <BrainCircuit className="text-primary h-5 w-5" />
-                     Math Mania
+                 <CardTitle className="text-xl flex items-center gap-1 font-black text-primary">
+                     <Activity className="h-5 w-5" />
+                     MathPulse
                  </CardTitle>
                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(roomCode)}>
-                       <ClipboardCopy className="h-4 w-4 mr-1"/> {roomCode}
+                    <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(roomCode)} className="font-mono font-bold">
+                       {roomCode}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={handleCopyLink}>
                        <Share2 className="h-4 w-4" />
@@ -553,7 +540,7 @@ const GameRoomPage: NextPage = () => {
                     </Button>
                  </div>
              </div>
-             <div className="flex items-center justify-between text-sm text-muted-foreground">
+             <div className="flex items-center justify-between text-sm text-muted-foreground font-medium">
                 <span>Round: {gameState.currentRound > 0 ? gameState.currentRound : '-'}</span>
                 <div className="flex items-center gap-1">
                     <Clock className="h-4 w-4" />
@@ -571,20 +558,20 @@ const GameRoomPage: NextPage = () => {
         </Card>
 
         <div className="flex-shrink-0 m-2 mt-0">
-           <Button onClick={() => setShowScoreboard(!showScoreboard)} variant="outline" size="sm" className="w-full mb-1">
-               {showScoreboard ? 'Hide Scores' : 'Show Scores'}
+           <Button onClick={() => setShowScoreboard(!showScoreboard)} variant="outline" size="sm" className="w-full mb-1 rounded-lg">
+               {showScoreboard ? 'Hide Pulse' : 'Show Pulse'}
            </Button>
            {showScoreboard && (
-              <Card className="shadow rounded-lg">
+              <Card className="shadow rounded-xl border-none">
                  <CardContent className="p-0">
                     <ScrollArea className={`p-2 ${gameState.isGameActive ? 'h-[100px]' : 'h-[180px]'}`}>
                     {sortedPlayers.map((player, index) => (
-                       <div key={player.id} className={`flex items-center justify-between p-1.5 rounded ${player.id === localPlayerInfo?.playerId ? 'bg-primary/10 font-semibold' : ''} text-sm mb-1`}>
+                       <div key={player.id} className={`flex items-center justify-between p-1.5 rounded-lg ${player.id === localPlayerInfo?.playerId ? 'bg-primary/10 font-bold' : ''} text-sm mb-1`}>
                           <div className="flex items-center gap-2">
-                              <span className="w-5 text-right text-muted-foreground">{index + 1}.</span>
-                              <Avatar className="h-6 w-6">
-                                <AvatarImage src={`https://picsum.photos/seed/${player.id}/24/24`} />
-                                <AvatarFallback>{player.name[0]}</AvatarFallback>
+                              <span className="w-5 text-right text-muted-foreground font-mono">{index + 1}</span>
+                              <Avatar className="h-7 w-7">
+                                <AvatarImage src={`https://picsum.photos/seed/${player.id}/28/28`} />
+                                <AvatarFallback className="text-[10px]">{player.name[0]}</AvatarFallback>
                               </Avatar>
                               <span className="truncate max-w-[120px]">{player.name} {player.isHost && '👑'}</span>
                           </div>
@@ -592,7 +579,7 @@ const GameRoomPage: NextPage = () => {
                                 {gameState.isGameActive && player.hasAnswered && (
                                      player.isCorrect === true ? <CheckCircle className="h-4 w-4 text-accent" /> : <XCircle className="h-4 w-4 text-destructive" />
                                 )}
-                                <span className="font-mono font-semibold w-10 text-right">{player.score}</span>
+                                <span className="font-mono font-black w-10 text-right">{player.score}</span>
                           </div>
                        </div>
                     ))}
@@ -605,62 +592,64 @@ const GameRoomPage: NextPage = () => {
         <div className="flex-grow flex flex-col justify-center items-center p-4 space-y-4 m-2 mt-0">
             {gameState.isGameActive ? (
                 <>
-                    <Card className="w-full bg-card shadow-lg text-center p-6">
-                        <CardDescription className="mb-2">Question {gameState.currentRound}</CardDescription>
-                        <CardTitle className="text-3xl font-mono">
+                    <Card className="w-full bg-card shadow-lg text-center p-8 rounded-2xl border-none">
+                        <CardDescription className="mb-4 font-bold text-primary/60">QUESTION {gameState.currentRound}</CardDescription>
+                        <CardTitle className="text-4xl font-black font-mono tracking-tight">
                            {(gameState.isShowingResults || isPlayerCorrect) ? `${gameState.question} = ${gameState.answer}` : `${gameState.question} = ?`}
                         </CardTitle>
                     </Card>
 
-                    <form onSubmit={handleAnswerSubmit} className="w-full space-y-2">
-                        <Input ref={answerInputRef} type="number" placeholder="Your Answer" value={currentAnswer} onChange={(e) => setCurrentAnswer(e.target.value)} className="text-center text-2xl h-14" disabled={isPlayerCorrect || gameState.isShowingResults} />
-                        <Button type="submit" className="w-full text-lg py-3" disabled={isPlayerCorrect || currentAnswer === '' || gameState.isShowingResults}>
-                            {isPlayerCorrect ? 'Correct!' : 'Submit Answer'}
+                    <form onSubmit={handleAnswerSubmit} className="w-full space-y-3">
+                        <Input ref={answerInputRef} type="number" placeholder="Pulse your answer..." value={currentAnswer} onChange={(e) => setCurrentAnswer(e.target.value)} className="text-center text-3xl h-16 rounded-2xl border-2 font-black" disabled={isPlayerCorrect || gameState.isShowingResults} />
+                        <Button type="submit" className="w-full text-xl py-8 rounded-2xl shadow-lg" disabled={isPlayerCorrect || currentAnswer === '' || gameState.isShowingResults}>
+                            {isPlayerCorrect ? 'Locked In!' : 'Submit'}
                          </Button>
                     </form>
                 </>
             ) : (
-                 <Card className="w-full bg-card shadow-lg p-4">
+                 <Card className="w-full bg-card shadow-lg p-4 rounded-2xl border-none">
                     {isHost ? (
                         <Tabs defaultValue="lobby" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="lobby">Lobby</TabsTrigger>
-                                <TabsTrigger value="custom">Custom Pool</TabsTrigger>
+                            <TabsList className="grid w-full grid-cols-2 rounded-xl h-12">
+                                <TabsTrigger value="lobby" className="rounded-lg">Lobby</TabsTrigger>
+                                <TabsTrigger value="custom" className="rounded-lg">Custom Pool</TabsTrigger>
                             </TabsList>
                             <TabsContent value="lobby" className="space-y-4 pt-4 text-center">
-                                <CardTitle>Ready to Start?</CardTitle>
-                                <CardDescription>All set! {gameState.customQuestions?.length ? `${gameState.customQuestions.length} custom questions added.` : 'Using random hard questions.'}</CardDescription>
-                                <Button onClick={startGame} className="w-full text-lg">Start Game</Button>
+                                <CardTitle className="text-2xl font-black">Ready to Pulse?</CardTitle>
+                                <CardDescription className="font-medium">{gameState.customQuestions?.length ? `${gameState.customQuestions.length} custom questions loaded.` : 'Random hard mode enabled.'}</CardDescription>
+                                <Button onClick={startGame} className="w-full py-8 text-xl rounded-2xl shadow-lg">Start Game</Button>
                             </TabsContent>
                             <TabsContent value="custom" className="space-y-4 pt-2">
                                 <div className="space-y-2">
                                     <div className="flex gap-2">
                                         <div className="flex-grow flex flex-col">
-                                            <Input placeholder="Expr (e.g. 25 * 4)" value={newQ} onChange={e => setNewQ(e.target.value)} />
+                                            <Input placeholder="Expr (e.g. 25 * 4)" value={newQ} onChange={e => setNewQ(e.target.value)} className="rounded-xl" />
                                             {autoCalcAns !== null && (
-                                                <span className="text-[10px] text-accent font-bold mt-0.5 ml-1">Ans: {autoCalcAns}</span>
+                                                <span className="text-[10px] text-accent font-black mt-1 ml-1 uppercase">Computed Answer: {autoCalcAns}</span>
                                             )}
                                         </div>
-                                        <Button size="icon" onClick={handleAddCustomQuestion} disabled={autoCalcAns === null}><Plus /></Button>
+                                        <Button size="icon" onClick={handleAddCustomQuestion} disabled={autoCalcAns === null} className="rounded-xl h-10 w-10"><Plus /></Button>
                                     </div>
-                                    <ScrollArea className="h-[150px] border rounded-md p-2">
+                                    <ScrollArea className="h-[150px] border rounded-xl p-2 bg-secondary/50">
                                         {(gameState.customQuestions || []).map((q, i) => (
-                                            <div key={i} className="flex justify-between items-center text-sm p-1 border-b last:border-0">
-                                                <span>{q.question} = {q.answer}</span>
-                                                <Button variant="ghost" size="sm" onClick={() => handleRemoveCustomQuestion(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                            <div key={i} className="flex justify-between items-center text-sm p-2 bg-card rounded-lg mb-1 shadow-sm">
+                                                <span className="font-mono font-bold">{q.question} = {q.answer}</span>
+                                                <Button variant="ghost" size="sm" onClick={() => handleRemoveCustomQuestion(i)} className="h-8 w-8 p-0"><Trash2 className="h-4 w-4 text-destructive" /></Button>
                                             </div>
                                         ))}
-                                        {(!gameState.customQuestions || gameState.customQuestions.length === 0) && <p className="text-center text-muted-foreground text-xs p-4">No custom questions. Random will be used.</p>}
+                                        {(!gameState.customQuestions || gameState.customQuestions.length === 0) && <p className="text-center text-muted-foreground text-xs p-8 italic">No custom questions added yet.</p>}
                                     </ScrollArea>
-                                    <Button onClick={startGame} className="w-full mt-4" variant="default">Start Game</Button>
+                                    <Button onClick={startGame} className="w-full mt-4 py-8 text-xl rounded-2xl shadow-lg" variant="default">Start Game</Button>
                                 </div>
                             </TabsContent>
                         </Tabs>
                     ) : (
-                        <div className="text-center space-y-4 py-8">
-                            <CardTitle>Waiting for host...</CardTitle>
-                            <Loader2 className="animate-spin m-auto text-primary" />
-                            <CardDescription>The host will start the challenge shortly.</CardDescription>
+                        <div className="text-center space-y-6 py-12">
+                            <Activity className="h-16 w-16 animate-pulse m-auto text-primary" />
+                            <div className="space-y-2">
+                                <CardTitle className="text-2xl font-black">Waiting for Host</CardTitle>
+                                <CardDescription className="font-medium">Get your fingers ready for the pulse...</CardDescription>
+                            </div>
                         </div>
                     )}
                  </Card>

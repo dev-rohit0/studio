@@ -1,30 +1,32 @@
-// src/app/page.tsx
+
 'use client';
 
 import type { NextPage } from 'next';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Users, Loader2 } from 'lucide-react';
+import { Home, Users, Loader2, Activity } from 'lucide-react';
 import { clearPlayerInfo } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import type { GameState } from '@/types/game';
-import AdBanner from '@/components/ads/AdBanner'; // Import AdBanner
+import AdBanner from '@/components/ads/AdBanner';
+import placeholders from '@/app/lib/placeholder-images.json';
 
 const HomePage: NextPage = () => {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
   const [isJoiningRoom, setIsJoiningRoom] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
   useEffect(() => {
     clearPlayerInfo();
-    console.log("Cleared player info on home page load.");
   }, []);
 
   const generateRoomCode = (): string => {
@@ -34,7 +36,6 @@ const HomePage: NextPage = () => {
   const handleCreateRoom = async () => {
     setIsCreatingRoom(true);
     const newRoomCode = generateRoomCode();
-    console.log(`[CreateRoom] Generated new room code: ${newRoomCode}`);
 
     const initialGameState: Omit<GameState, 'roomCode'> & { createdAt: any } = {
         question: 'Waiting for host to start...',
@@ -49,7 +50,6 @@ const HomePage: NextPage = () => {
 
     try {
       if (!db) {
-        console.error("[CreateRoom] Firestore database instance is not available.");
         toast({
           title: 'Error Creating Room',
           description: 'Database connection failed. Please try again later.',
@@ -60,24 +60,12 @@ const HomePage: NextPage = () => {
       }
 
       const roomDocRef = doc(db, 'gameRooms', newRoomCode);
-      console.log(`[CreateRoom] Attempting to create Firestore document at path: ${roomDocRef.path}`);
       await setDoc(roomDocRef, initialGameState);
-      console.log(`[CreateRoom] Successfully created Firestore document for room: ${newRoomCode}`);
       router.push(`/room/${newRoomCode}?host=true`);
     } catch (error: any) {
-      console.error(`[CreateRoom] Error creating Firestore document for room ${newRoomCode}:`, error);
-      let description = 'Could not create the game room. Please check connection or permissions and try again.';
-      if (error.code === 'permission-denied') {
-          description = 'Permission denied. Check Firestore rules.';
-      } else if (error.message?.includes('offline')) {
-           description = 'Network error. Please check your internet connection.';
-      } else if (error.message?.includes('INVALID_ARGUMENT')) {
-            description = 'Invalid data sent to the server. Please contact support.';
-             console.error("[CreateRoom] Detailed error data:", error.details);
-      }
       toast({
         title: 'Error Creating Room',
-        description: description,
+        description: 'Could not create the game room. Please try again.',
         variant: 'destructive',
       });
       setIsCreatingRoom(false);
@@ -96,11 +84,9 @@ const HomePage: NextPage = () => {
     }
 
     setIsJoiningRoom(true);
-    console.log(`[JoinRoom] Attempting to join room with code: ${codeToJoin}`);
 
     try {
         if (!db) {
-          console.error("[JoinRoom] Firestore database instance is not available.");
           toast({
             title: 'Error Joining Room',
             description: 'Database connection failed. Please try again later.',
@@ -111,32 +97,22 @@ const HomePage: NextPage = () => {
         }
 
         const roomDocRef = doc(db, 'gameRooms', codeToJoin);
-        console.log(`[JoinRoom] Checking Firestore document: gameRooms/${codeToJoin}`);
         const docSnap = await getDoc(roomDocRef);
 
         if (docSnap.exists()) {
-            console.log(`[JoinRoom] Room ${codeToJoin} found in Firestore. Data:`, docSnap.data());
             router.push(`/room/${codeToJoin}`);
         } else {
-            console.warn(`[JoinRoom] Room ${codeToJoin} not found in Firestore.`);
             toast({
                 title: 'Room Not Found',
-                description: `Could not find a game room with code ${codeToJoin}. Please double-check the code.`,
+                description: `Could not find a game room with code ${codeToJoin}.`,
                 variant: 'destructive',
             });
             setIsJoiningRoom(false);
         }
     } catch (error: any) {
-        console.error(`[JoinRoom] Error checking Firestore document for room ${codeToJoin}:`, error);
-         let description = 'Could not check if the room exists. Please check connection and try again.';
-          if (error.code === 'permission-denied') {
-              description = 'Permission denied. Check Firestore rules.';
-          } else if (error.message?.includes('offline')) {
-               description = 'Network error. Please check your internet connection.';
-          }
         toast({
             title: 'Error Joining Room',
-            description: description,
+            description: 'Could not check if the room exists.',
             variant: 'destructive',
         });
         setIsJoiningRoom(false);
@@ -145,18 +121,33 @@ const HomePage: NextPage = () => {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full max-w-md p-4">
-      <Card className="w-full shadow-lg">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold text-primary flex items-center justify-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-brain-circuit"><path d="M12 5a3 3 0 1 0-5.997.142"/><path d="M18 5a3 3 0 1 0-5.997.142"/><path d="M12 12a3 3 0 1 0-5.997.142"/><path d="M18 12a3 3 0 1 0-5.997.142"/><path d="M12 19a3 3 0 1 0-5.997.142"/><path d="M18 19a3 3 0 1 0-5.997.142"/><path d="M12 8V5"/><path d="M18 8V5"/><path d="M12 15v-3"/><path d="M18 15v-3"/><path d="M12 22v-3"/><path d="M18 22v-3"/><path d="m15 6-3-1-3 1"/><path d="m15 13-3-1-3 1"/><path d="m15 20-3-1-3 1"/><path d="M9 6.14A3 3 0 0 0 9 5"/><path d="M9 13.14A3 3 0 0 0 9 12"/><path d="M9 20.14A3 3 0 0 0 9 19"/><path d="M15 6.14A3 3 0 0 1 15 5"/><path d="M15 13.14A3 3 0 0 1 15 12"/><path d="M15 20.14A3 3 0 0 1 15 19"/></svg>
-            Math Mania
-          </CardTitle>
-          <CardDescription>Fastest Finger First!</CardDescription>
+      <Card className="w-full shadow-lg border-none">
+        <CardHeader className="text-center space-y-4">
+          <div className="flex flex-col items-center gap-2">
+            {!logoError ? (
+              <Image 
+                src={placeholders.logo.url} 
+                alt={placeholders.logo.alt} 
+                width={120} 
+                height={40} 
+                className="object-contain mb-2"
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <div className="bg-primary/10 p-4 rounded-full mb-2">
+                <Activity className="h-12 w-12 text-primary animate-pulse" />
+              </div>
+            )}
+            <CardTitle className="text-4xl font-black tracking-tight text-primary">
+              MathPulse
+            </CardTitle>
+          </div>
+          <CardDescription className="text-base font-medium">Fastest Finger First Challenge!</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <Button
             onClick={handleCreateRoom}
-            className="w-full text-lg py-6"
+            className="w-full text-lg py-7 rounded-xl"
             aria-label="Create a new game room"
             disabled={isCreatingRoom || isJoiningRoom}
           >
@@ -168,7 +159,7 @@ const HomePage: NextPage = () => {
                <span className="w-full border-t" />
              </div>
              <div className="relative flex justify-center text-xs uppercase">
-               <span className="bg-card px-2 text-muted-foreground">
+               <span className="bg-card px-2 text-muted-foreground font-semibold">
                  Or join a room
                </span>
              </div>
@@ -179,18 +170,15 @@ const HomePage: NextPage = () => {
               placeholder="Enter 6-digit Room Code"
               value={roomCodeInput}
               onChange={(e) => setRoomCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="text-center text-lg tracking-widest"
+              className="text-center text-xl tracking-widest h-14 rounded-xl border-2 focus-visible:ring-primary"
               maxLength={6}
-              pattern="\d{6}"
               inputMode="numeric"
-              aria-label="Enter 6-digit room code"
               disabled={isCreatingRoom || isJoiningRoom}
             />
             <Button
               onClick={handleJoinRoom}
               variant="secondary"
-              className="w-full text-lg py-6"
-              aria-label="Join an existing game room"
+              className="w-full text-lg py-7 rounded-xl"
               disabled={roomCodeInput.length !== 6 || isJoiningRoom || isCreatingRoom}
             >
                {isJoiningRoom ? <Loader2 className="mr-2 animate-spin" /> : <Users className="mr-2" />}
@@ -198,8 +186,8 @@ const HomePage: NextPage = () => {
             </Button>
           </div>
         </CardContent>
-         <CardFooter className="text-xs text-muted-foreground text-center justify-center">
-            Get ready to test your math skills!
+         <CardFooter className="text-xs text-muted-foreground text-center justify-center italic">
+            Test your pulse, solve the equations.
          </CardFooter>
       </Card>
       <AdBanner className="mt-8 w-full max-w-md" />

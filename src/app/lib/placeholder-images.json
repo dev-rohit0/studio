@@ -1,0 +1,15 @@
+
+{
+  "logo": {
+    "url": "/logo.png",
+    "width": 200,
+    "height": 200,
+    "alt": "MathPulse Logo"
+  },
+  "avatarPlaceholder": {
+    "url": "https://picsum.photos/seed/avatar/200/200",
+    "width": 200,
+    "height": 200,
+    "alt": "Player Avatar"
+  }
+}
