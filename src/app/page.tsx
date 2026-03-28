@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Users, Loader2, Activity } from 'lucide-react';
+import { Home, Users, Loader2, Activity, Zap } from 'lucide-react';
 import { clearPlayerInfo } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
@@ -37,7 +37,7 @@ const HomePage: NextPage = () => {
     const newRoomCode = generateRoomCode();
 
     const initialGameState: Omit<GameState, 'roomCode'> & { createdAt: any } = {
-        question: 'Waiting for host to start...',
+        question: 'Waiting for host...',
         answer: 0,
         players: [],
         timeLeft: 0,
@@ -50,8 +50,8 @@ const HomePage: NextPage = () => {
     try {
       if (!db) {
         toast({
-          title: 'Error Creating Room',
-          description: 'Database connection failed. Please try again later.',
+          title: 'Connection Error',
+          description: 'Database is currently offline.',
           variant: 'destructive',
         });
         setIsCreatingRoom(false);
@@ -76,7 +76,7 @@ const HomePage: NextPage = () => {
     if (!/^\d{6}$/.test(codeToJoin)) {
       toast({
         title: 'Invalid Room Code',
-        description: 'Please enter a valid 6-digit room code.',
+        description: 'Please enter a valid 6-digit code.',
         variant: 'destructive',
       });
       return;
@@ -87,8 +87,8 @@ const HomePage: NextPage = () => {
     try {
         if (!db) {
           toast({
-            title: 'Error Joining Room',
-            description: 'Database connection failed. Please try again later.',
+            title: 'Connection Error',
+            description: 'Database is currently offline.',
             variant: 'destructive',
           });
           setIsJoiningRoom(false);
@@ -103,7 +103,7 @@ const HomePage: NextPage = () => {
         } else {
             toast({
                 title: 'Room Not Found',
-                description: `Could not find a game room with code ${codeToJoin}.`,
+                description: `Room ${codeToJoin} does not exist.`,
                 variant: 'destructive',
             });
             setIsJoiningRoom(false);
@@ -111,7 +111,7 @@ const HomePage: NextPage = () => {
     } catch (error: any) {
         toast({
             title: 'Error Joining Room',
-            description: 'Could not check if the room exists.',
+            description: 'Could not connect to the room.',
             variant: 'destructive',
         });
         setIsJoiningRoom(false);
@@ -119,74 +119,79 @@ const HomePage: NextPage = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen w-full max-w-md p-4">
-      <Card className="w-full shadow-lg border-none">
-        <CardHeader className="text-center space-y-1">
-          <div className="flex flex-col items-center">
-            {!logoError ? (
-              <Image 
-                src={placeholders.logo.url} 
-                alt={placeholders.logo.alt} 
-                width={180} 
-                height={60} 
-                className="object-contain"
-                onError={() => setLogoError(true)}
-              />
-            ) : (
-              <div className="bg-primary/10 p-5 rounded-full">
-                <Activity className="h-16 w-16 text-primary animate-pulse" />
-              </div>
-            )}
+    <div className="flex flex-col items-center justify-center min-h-screen w-full max-w-md p-4 bg-secondary/50">
+      <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="flex flex-col items-center">
+          {!logoError ? (
+            <Image 
+              src={placeholders.logo.url} 
+              alt={placeholders.logo.alt} 
+              width={220} 
+              height={80} 
+              className="object-contain drop-shadow-xl"
+              onError={() => setLogoError(true)}
+            />
+          ) : (
+            <div className="bg-primary/20 p-6 rounded-3xl border-2 border-primary/20 backdrop-blur-sm">
+              <Activity className="h-20 w-20 text-primary animate-pulse" />
+            </div>
+          )}
+          <div className="mt-4 px-4 py-1.5 bg-primary/10 rounded-full border border-primary/10">
+            <p className="text-xs font-black uppercase tracking-widest text-primary/80">Fastest Finger First</p>
           </div>
-          <CardDescription className="text-base font-medium">Fastest Finger First Challenge!</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+        </div>
+      </div>
+
+      <Card className="w-full shadow-2xl rounded-3xl border-none bg-white/80 backdrop-blur-md overflow-hidden animate-in zoom-in-95 duration-500">
+        <CardContent className="space-y-6 pt-8 pb-8 px-8">
           <Button
             onClick={handleCreateRoom}
-            className="w-full text-lg py-7 rounded-xl"
-            aria-label="Create a new game room"
+            className="w-full text-xl py-8 rounded-2xl shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
             disabled={isCreatingRoom || isJoiningRoom}
           >
-            {isCreatingRoom ? <Loader2 className="mr-2 animate-spin" /> : <Home className="mr-2" />}
-            {isCreatingRoom ? 'Creating...' : 'Create Room'}
+            {isCreatingRoom ? <Loader2 className="mr-2 animate-spin" /> : <Zap className="mr-2 group-hover:animate-bounce" />}
+            {isCreatingRoom ? 'Creating...' : 'Launch Lobby'}
           </Button>
+
           <div className="relative">
              <div className="absolute inset-0 flex items-center">
-               <span className="w-full border-t" />
+               <span className="w-full border-t border-slate-200" />
              </div>
-             <div className="relative flex justify-center text-xs uppercase">
-               <span className="bg-card px-2 text-muted-foreground font-semibold">
-                 Or join a room
+             <div className="relative flex justify-center text-xs uppercase tracking-tighter">
+               <span className="bg-white/80 px-4 text-muted-foreground font-bold">
+                 Join Active Pulse
                </span>
              </div>
            </div>
-          <div className="flex flex-col space-y-2">
+
+          <div className="flex flex-col space-y-3">
             <Input
               type="text"
-              placeholder="Enter 6-digit Room Code"
+              placeholder="000000"
               value={roomCodeInput}
               onChange={(e) => setRoomCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="text-center text-xl tracking-widest h-14 rounded-xl border-2 focus-visible:ring-primary"
+              className="text-center text-3xl font-mono tracking-[0.5em] h-16 rounded-2xl border-2 focus-visible:ring-primary/40 bg-slate-50"
               maxLength={6}
               inputMode="numeric"
               disabled={isCreatingRoom || isJoiningRoom}
             />
             <Button
               onClick={handleJoinRoom}
-              variant="secondary"
-              className="w-full text-lg py-7 rounded-xl"
+              variant="outline"
+              className="w-full text-lg py-8 rounded-2xl border-2 hover:bg-primary/5 hover:border-primary/40 transition-all"
               disabled={roomCodeInput.length !== 6 || isJoiningRoom || isCreatingRoom}
             >
                {isJoiningRoom ? <Loader2 className="mr-2 animate-spin" /> : <Users className="mr-2" />}
-               {isJoiningRoom ? 'Joining...' : 'Join Room'}
+               {isJoiningRoom ? 'Joining...' : 'Enter Game'}
             </Button>
           </div>
         </CardContent>
-         <CardFooter className="text-xs text-muted-foreground text-center justify-center italic">
-            Test your pulse, solve the equations.
+         <CardFooter className="text-[10px] text-muted-foreground/60 text-center justify-center uppercase font-black tracking-widest pb-6">
+            Precision • Speed • MathPulse
          </CardFooter>
       </Card>
-      <AdBanner className="mt-8 w-full max-w-md" />
+      
+      <AdBanner className="mt-8 w-full max-w-md border-none bg-transparent opacity-60" />
     </div>
   );
 };
