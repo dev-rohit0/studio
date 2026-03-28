@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Home, Users, Loader2, Activity, Zap } from 'lucide-react';
+import { Users, Loader2, Activity, Zap } from 'lucide-react';
 import { clearPlayerInfo } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
@@ -119,58 +119,56 @@ const HomePage: NextPage = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen w-full max-w-md p-4 bg-secondary/50">
-      <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="flex flex-col items-center">
-          {!logoError ? (
-            <Image 
-              src={placeholders.logo.url} 
-              alt={placeholders.logo.alt} 
-              width={220} 
-              height={80} 
-              className="object-contain drop-shadow-xl"
-              onError={() => setLogoError(true)}
-            />
-          ) : (
-            <div className="bg-primary/20 p-6 rounded-3xl border-2 border-primary/20 backdrop-blur-sm">
-              <Activity className="h-20 w-20 text-primary animate-pulse" />
-            </div>
-          )}
-          <div className="mt-4 px-4 py-1.5 bg-primary/10 rounded-full border border-primary/10">
-            <p className="text-xs font-black uppercase tracking-widest text-primary/80">Fastest Finger First</p>
+    <div className="flex flex-col items-center justify-center min-h-dvh w-full max-w-lg mx-auto p-4 bg-secondary/30">
+      <div className="mb-8 w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {!logoError ? (
+          <Image 
+            src={placeholders.logo.url} 
+            alt={placeholders.logo.alt} 
+            width={240} 
+            height={80} 
+            className="object-contain drop-shadow-2xl transition-transform hover:scale-105"
+            onError={() => setLogoError(true)}
+          />
+        ) : (
+          <div className="bg-primary/20 p-8 rounded-[2rem] border-2 border-primary/20 backdrop-blur-sm">
+            <Activity className="h-16 w-16 text-primary animate-pulse" />
           </div>
+        )}
+        <div className="mt-6 px-6 py-2 bg-white/50 backdrop-blur-sm rounded-full border border-primary/10 shadow-sm">
+          <p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.3em] text-primary/80">Fastest Finger First Challenge</p>
         </div>
       </div>
 
-      <Card className="w-full shadow-2xl rounded-3xl border-none bg-white/80 backdrop-blur-md overflow-hidden animate-in zoom-in-95 duration-500">
-        <CardContent className="space-y-6 pt-8 pb-8 px-8">
+      <Card className="w-full shadow-2xl rounded-[2.5rem] border-none bg-white/80 backdrop-blur-xl overflow-hidden animate-in zoom-in-95 duration-500">
+        <CardContent className="space-y-8 pt-10 pb-10 px-6 sm:px-10">
           <Button
             onClick={handleCreateRoom}
-            className="w-full text-xl py-8 rounded-2xl shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+            className="w-full text-xl py-10 rounded-3xl shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] group bg-primary hover:bg-primary/90"
             disabled={isCreatingRoom || isJoiningRoom}
           >
-            {isCreatingRoom ? <Loader2 className="mr-2 animate-spin" /> : <Zap className="mr-2 group-hover:animate-bounce" />}
-            {isCreatingRoom ? 'Creating...' : 'Launch Lobby'}
+            {isCreatingRoom ? <Loader2 className="mr-3 animate-spin" /> : <Zap className="mr-3 fill-white group-hover:animate-bounce" />}
+            {isCreatingRoom ? 'Generating Pulse...' : 'Launch Global Lobby'}
           </Button>
 
           <div className="relative">
              <div className="absolute inset-0 flex items-center">
                <span className="w-full border-t border-slate-200" />
              </div>
-             <div className="relative flex justify-center text-xs uppercase tracking-tighter">
-               <span className="bg-white/80 px-4 text-muted-foreground font-bold">
+             <div className="relative flex justify-center text-[10px] uppercase tracking-[0.2em] font-black">
+               <span className="bg-white/90 px-4 text-muted-foreground/60">
                  Join Active Pulse
                </span>
              </div>
            </div>
 
-          <div className="flex flex-col space-y-3">
+          <div className="flex flex-col space-y-4">
             <Input
               type="text"
               placeholder="000000"
               value={roomCodeInput}
               onChange={(e) => setRoomCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="text-center text-3xl font-mono tracking-[0.5em] h-16 rounded-2xl border-2 focus-visible:ring-primary/40 bg-slate-50"
+              className="text-center text-4xl sm:text-5xl font-mono tracking-[0.3em] h-20 sm:h-24 rounded-3xl border-2 focus-visible:ring-primary/40 bg-slate-50/50"
               maxLength={6}
               inputMode="numeric"
               disabled={isCreatingRoom || isJoiningRoom}
@@ -178,20 +176,20 @@ const HomePage: NextPage = () => {
             <Button
               onClick={handleJoinRoom}
               variant="outline"
-              className="w-full text-lg py-8 rounded-2xl border-2 hover:bg-primary/5 hover:border-primary/40 transition-all"
+              className="w-full text-lg py-8 rounded-3xl border-2 hover:bg-primary/5 hover:border-primary/40 transition-all font-bold"
               disabled={roomCodeInput.length !== 6 || isJoiningRoom || isCreatingRoom}
             >
-               {isJoiningRoom ? <Loader2 className="mr-2 animate-spin" /> : <Users className="mr-2" />}
-               {isJoiningRoom ? 'Joining...' : 'Enter Game'}
+               {isJoiningRoom ? <Loader2 className="mr-3 animate-spin" /> : <Users className="mr-3" />}
+               {isJoiningRoom ? 'Syncing...' : 'Enter Game'}
             </Button>
           </div>
         </CardContent>
-         <CardFooter className="text-[10px] text-muted-foreground/60 text-center justify-center uppercase font-black tracking-widest pb-6">
+         <CardFooter className="text-[10px] text-muted-foreground/40 text-center justify-center uppercase font-black tracking-[0.4em] pb-8">
             Precision • Speed • MathPulse
          </CardFooter>
       </Card>
       
-      <AdBanner className="mt-8 w-full max-w-md border-none bg-transparent opacity-60" />
+      <AdBanner className="mt-8 w-full max-w-md border-none bg-transparent opacity-40 hover:opacity-100 transition-opacity" />
     </div>
   );
 };
