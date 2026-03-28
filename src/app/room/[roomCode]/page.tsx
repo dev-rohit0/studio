@@ -14,8 +14,8 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle, ClipboardCopy, Users, Share2, Clock, LogOut, Loader2, Plus, Trash2, BrainCircuit, Trophy, Medal, Award } from 'lucide-react';
 import { getPlayerInfo, savePlayerInfo, clearPlayerInfo, generateId } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, arrayUnion, getDoc, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
-import type { Player, GameState, CustomQuestion } from '@/types/game';
+import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
+import type { Player, GameState } from '@/types/game';
 import AdBanner from '@/components/ads/AdBanner';
 
 const ROUND_DURATION = 30;
@@ -66,7 +66,6 @@ const GameRoomPage: NextPage = () => {
   // Local timer management
   useEffect(() => {
     if (gameState?.isGameActive && !gameState?.isGameOver && !gameState?.isShowingResults && gameState?.currentRound > 0) {
-      setRoundTimeLeft(ROUND_DURATION);
       const intervalId = setInterval(() => {
         setRoundTimeLeft((prev) => {
           if (prev <= 0) {
@@ -147,7 +146,15 @@ const GameRoomPage: NextPage = () => {
     unsubscribeRef.current = onSnapshot(roomDocRef, (docSnap) => {
         if (docSnap.exists()) {
             const data = docSnap.data() as GameState;
-            setGameState({ ...data, roomCode });
+            
+            setGameState(prev => {
+                // If a new round has started, force reset the local timer immediately
+                if (prev?.currentRound !== data.currentRound && data.isGameActive && !data.isShowingResults) {
+                    setRoundTimeLeft(ROUND_DURATION);
+                }
+                return { ...data, roomCode };
+            });
+            
             setIsLoading(false);
 
             const pInfo = getPlayerInfo();
@@ -219,6 +226,7 @@ const GameRoomPage: NextPage = () => {
         lastActive: Timestamp.now()
     }));
 
+    setRoundTimeLeft(ROUND_DURATION);
     await updateFirestoreState({
         question: nextQ,
         answer: nextA,
@@ -264,6 +272,7 @@ const GameRoomPage: NextPage = () => {
         lastActive: Timestamp.now()
     }));
 
+    setRoundTimeLeft(ROUND_DURATION);
     await updateFirestoreState({
         question: nextQ,
         answer: nextA,
