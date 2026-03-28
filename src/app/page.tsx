@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { NextPage } from 'next';
@@ -122,20 +121,20 @@ const HomePage: NextPage = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-full max-w-md p-4">
       <Card className="w-full shadow-lg border-none">
-        <CardHeader className="text-center space-y-4">
-          <div className="flex flex-col items-center gap-2">
+        <CardHeader className="text-center space-y-1">
+          <div className="flex flex-col items-center">
             {!logoError ? (
               <Image 
                 src={placeholders.logo.url} 
                 alt={placeholders.logo.alt} 
-                width={120} 
-                height={40} 
-                className="object-contain mb-2"
+                width={180} 
+                height={60} 
+                className="object-contain"
                 onError={() => setLogoError(true)}
               />
             ) : (
-              <div className="bg-primary/10 p-4 rounded-full mb-2">
-                <Activity className="h-12 w-12 text-primary animate-pulse" />
+              <div className="bg-primary/10 p-5 rounded-full">
+                <Activity className="h-16 w-16 text-primary animate-pulse" />
               </div>
             )}
           </div>
