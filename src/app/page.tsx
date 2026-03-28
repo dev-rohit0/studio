@@ -1,3 +1,4 @@
+
 'use client';
 
 import type { NextPage } from 'next';
@@ -13,7 +14,6 @@ import { clearPlayerInfo } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import type { GameState } from '@/types/game';
-import AdBanner from '@/components/ads/AdBanner';
 import placeholders from '@/app/lib/placeholder-images.json';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -29,172 +29,81 @@ const HomePage: NextPage = () => {
     clearPlayerInfo();
   }, []);
 
-  const generateRoomCode = (): string => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
+  const generateRoomCode = () => Math.floor(100000 + Math.random() * 900000).toString();
 
   const handleCreateRoom = async () => {
     setIsCreatingRoom(true);
-    const newRoomCode = generateRoomCode();
-
-    const initialGameState: Omit<GameState, 'roomCode'> & { createdAt: any } = {
-        question: 'Waiting for host...',
-        answer: 0,
-        players: [],
-        timeLeft: 0,
-        isGameActive: false,
-        currentRound: 0,
-        roundStartTime: null,
-        createdAt: serverTimestamp(),
-    };
-
+    const code = generateRoomCode();
     try {
-      if (!db) {
-        toast({
-          title: 'Connection Error',
-          description: 'Database is currently offline.',
-          variant: 'destructive',
-        });
-        setIsCreatingRoom(false);
-        return;
-      }
-
-      const roomDocRef = doc(db, 'gameRooms', newRoomCode);
-      await setDoc(roomDocRef, initialGameState);
-      router.push(`/room/${newRoomCode}?host=true`);
-    } catch (error: any) {
-      toast({
-        title: 'Error Creating Room',
-        description: 'Could not create the game room. Please try again.',
-        variant: 'destructive',
+      if (!db) throw new Error();
+      await setDoc(doc(db, 'gameRooms', code), {
+        question: 'Ready...', answer: 0, players: [], timeLeft: 0, isGameActive: false,
+        currentRound: 0, roundStartTime: null, createdAt: serverTimestamp(), customQuestions: []
       });
+      router.push(`/room/${code}?host=true`);
+    } catch {
+      toast({ title: 'Sync Error', description: 'Could not initialize pulse lobby.', variant: 'destructive' });
       setIsCreatingRoom(false);
     }
   };
 
   const handleJoinRoom = async () => {
-    const codeToJoin = roomCodeInput.trim();
-    if (!/^\d{6}$/.test(codeToJoin)) {
-      toast({
-        title: 'Invalid Room Code',
-        description: 'Please enter a valid 6-digit code.',
-        variant: 'destructive',
-      });
+    const code = roomCodeInput.trim();
+    if (!/^\d{6}$/.test(code)) {
+      toast({ title: 'Invalid Code', description: 'Enter a 6-digit pulse code.', variant: 'destructive' });
       return;
     }
-
     setIsJoiningRoom(true);
-
     try {
-        if (!db) {
-          toast({
-            title: 'Connection Error',
-            description: 'Database is currently offline.',
-            variant: 'destructive',
-          });
-          setIsJoiningRoom(false);
-          return;
-        }
-
-        const roomDocRef = doc(db, 'gameRooms', codeToJoin);
-        const docSnap = await getDoc(roomDocRef);
-
-        if (docSnap.exists()) {
-            router.push(`/room/${codeToJoin}`);
-        } else {
-            toast({
-                title: 'Room Not Found',
-                description: `Room ${codeToJoin} does not exist.`,
-                variant: 'destructive',
-            });
-            setIsJoiningRoom(false);
-        }
-    } catch (error: any) {
-        toast({
-            title: 'Error Joining Room',
-            description: 'Could not connect to the room.',
-            variant: 'destructive',
-        });
-        setIsJoiningRoom(false);
+      if (!db) throw new Error();
+      const snap = await getDoc(doc(db, 'gameRooms', code));
+      if (snap.exists()) router.push(`/room/${code}`);
+      else { toast({ title: 'Room Offline', variant: 'destructive' }); setIsJoiningRoom(false); }
+    } catch {
+      toast({ title: 'Network Error', variant: 'destructive' });
+      setIsJoiningRoom(false);
     }
   };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-dvh w-full max-w-lg mx-auto p-4 relative">
-      <div className="absolute top-4 right-4 z-50">
-        <ThemeToggle />
-      </div>
+      <div className="absolute top-4 right-4 z-50"><ThemeToggle /></div>
 
-      <div className="mb-8 w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-700">
-        {!logoError ? (
-          <Image 
-            src={placeholders.logo.url} 
-            alt={placeholders.logo.alt} 
-            width={180} 
-            height={60} 
-            className="object-contain drop-shadow-2xl transition-transform hover:scale-105 dark:invert dark:brightness-200"
-            onError={() => setLogoError(true)}
-          />
-        ) : (
-          <div className="bg-primary/20 p-6 rounded-[2rem] border-2 border-primary/20 backdrop-blur-sm">
-            <Activity className="h-12 w-12 text-primary animate-pulse" />
-          </div>
-        )}
-        <div className="mt-4 px-5 py-1.5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-full border border-primary/10 dark:border-primary/20 shadow-sm">
-          <p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.2em] text-primary/80 dark:text-primary">Fastest Finger First Challenge</p>
+      <div className="mb-10 w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] shadow-2xl border border-slate-100 dark:border-slate-800 mb-4 transition-transform hover:scale-[1.02]">
+          {!logoError ? (
+            <Image src={placeholders.logo.url} alt="MathPulse" width={140} height={45} className="object-contain" onError={() => setLogoError(true)} />
+          ) : (
+            <Activity className="h-10 w-10 text-primary animate-pulse" />
+          )}
+        </div>
+        <div className="px-4 py-1 bg-primary/5 dark:bg-primary/10 rounded-full border border-primary/10">
+          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/80">Fastest Finger First Challenge</p>
         </div>
       </div>
 
-      <Card className="w-full shadow-2xl rounded-[2.5rem] border-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl overflow-hidden animate-in zoom-in-95 duration-500">
-        <CardContent className="space-y-6 pt-10 pb-10 px-6 sm:px-10">
-          <Button
-            onClick={handleCreateRoom}
-            className="w-full text-lg py-8 rounded-3xl shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] group bg-primary hover:bg-primary/90 text-white"
-            disabled={isCreatingRoom || isJoiningRoom}
-          >
-            {isCreatingRoom ? <Loader2 className="mr-3 animate-spin" /> : <Zap className="mr-3 fill-white group-hover:animate-bounce" />}
-            {isCreatingRoom ? 'Generating Pulse...' : 'Launch Global Lobby'}
+      <Card className="w-full shadow-2xl rounded-[2.5rem] border-none bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl animate-in zoom-in-95 duration-500 overflow-hidden">
+        <CardContent className="space-y-8 pt-12 pb-10 px-10">
+          <Button onClick={handleCreateRoom} className="w-full py-7 rounded-2xl shadow-xl transition-all hover:translate-y-[-2px] bg-primary text-white text-xs font-black" disabled={isCreatingRoom || isJoiningRoom}>
+            {isCreatingRoom ? <Loader2 className="mr-3 animate-spin h-4 w-4" /> : <Zap className="mr-3 fill-white h-4 w-4" />}
+            {isCreatingRoom ? 'INITIALIZING PULSE...' : 'LAUNCH GLOBAL LOBBY'}
           </Button>
 
           <div className="relative">
-             <div className="absolute inset-0 flex items-center">
-               <span className="w-full border-t border-slate-200 dark:border-slate-800" />
-             </div>
-             <div className="relative flex justify-center text-[10px] uppercase tracking-[0.2em] font-black">
-               <span className="bg-white/90 dark:bg-slate-900 px-4 text-muted-foreground/60">
-                 Join Active Pulse
-               </span>
-             </div>
+             <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-slate-100 dark:border-slate-800" /></div>
+             <div className="relative flex justify-center text-[7px] uppercase tracking-[0.3em] font-black"><span className="bg-white dark:bg-slate-900 px-4 text-muted-foreground/40">Active Sync</span></div>
            </div>
 
           <div className="flex flex-col space-y-4">
-            <Input
-              type="text"
-              placeholder="000000"
-              value={roomCodeInput}
-              onChange={(e) => setRoomCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="text-center text-3xl sm:text-4xl font-mono tracking-[0.3em] h-16 sm:h-20 rounded-3xl border-2 dark:border-slate-800 focus-visible:ring-primary/40 bg-slate-50/50 dark:bg-slate-950/50"
-              maxLength={6}
-              inputMode="numeric"
-              disabled={isCreatingRoom || isJoiningRoom}
-            />
-            <Button
-              onClick={handleJoinRoom}
-              variant="outline"
-              className="w-full text-base py-6 rounded-3xl border-2 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/40 transition-all font-bold dark:border-slate-800"
-              disabled={roomCodeInput.length !== 6 || isJoiningRoom || isCreatingRoom}
-            >
-               {isJoiningRoom ? <Loader2 className="mr-3 animate-spin" /> : <Users className="mr-3" />}
-               {isJoiningRoom ? 'Syncing...' : 'Enter Game'}
+            <Input type="text" placeholder="000000" value={roomCodeInput} onChange={e => setRoomCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))} className="text-center text-2xl font-mono tracking-[0.4em] h-14 rounded-2xl border-2 dark:bg-slate-950/50" maxLength={6} disabled={isCreatingRoom || isJoiningRoom} />
+            <Button onClick={handleJoinRoom} variant="outline" className="w-full py-6 rounded-2xl border-2 font-black text-xs" disabled={roomCodeInput.length !== 6 || isJoiningRoom || isCreatingRoom}>
+               {isJoiningRoom ? <Loader2 className="mr-3 animate-spin h-4 w-4" /> : <Users className="mr-3 h-4 w-4" />}
+               {isJoiningRoom ? 'SYNCING...' : 'ENTER PULSE'}
             </Button>
           </div>
         </CardContent>
-         <CardFooter className="text-[10px] text-muted-foreground/40 text-center justify-center uppercase font-black tracking-[0.3em] pb-8">
-            Precision • Speed • MathPulse
-         </CardFooter>
+         <CardFooter className="text-[7px] text-muted-foreground/30 text-center justify-center uppercase font-black tracking-[0.4em] pb-10">Precision • Speed • MathPulse</CardFooter>
       </Card>
-      
-      <AdBanner className="mt-8 w-full max-w-md border-none bg-transparent opacity-40 hover:opacity-100 transition-opacity" />
     </div>
   );
 };
