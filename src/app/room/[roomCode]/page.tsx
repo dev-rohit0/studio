@@ -10,19 +10,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, XCircle, ClipboardCopy, Users, Share2, Clock, LogOut, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, ClipboardCopy, Users, Share2, Clock, LogOut, Loader2, Plus, Trash2, BrainCircuit } from 'lucide-react';
 import { getPlayerInfo, savePlayerInfo, clearPlayerInfo, generateId } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, arrayUnion, deleteDoc, getDoc, writeBatch, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
-import type { Player, GameState } from '@/types/game';
+import { doc, onSnapshot, updateDoc, arrayUnion, getDoc, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
+import type { Player, GameState, CustomQuestion } from '@/types/game';
 import AdBanner from '@/components/ads/AdBanner';
 
-const ROUND_DURATION = 30; // seconds
-const RESULTS_DISPLAY_DURATION = 3000; // milliseconds
-const INACTIVITY_CLEANUP_INTERVAL = 30000; // 30 seconds
-const PLAYER_INACTIVITY_TIMEOUT = 60000; // 60 seconds (1 minute) for a player to be considered inactive
-
+const ROUND_DURATION = 30;
+const RESULTS_DISPLAY_DURATION = 3000;
+const INACTIVITY_CLEANUP_INTERVAL = 30000;
+const PLAYER_INACTIVITY_TIMEOUT = 60000;
 
 const GameRoomPage: NextPage = () => {
   const params = useParams();
@@ -40,72 +40,65 @@ const GameRoomPage: NextPage = () => {
   const [isJoining, setIsJoining] = useState(true);
   const [showScoreboard, setShowScoreboard] = useState(true);
   const [isRoundEnding, setIsRoundEnding] = useState(false);
+  
+  // Custom question form state
+  const [newQ, setNewQ] = useState('');
+  const [newA, setNewA] = useState('');
 
   const roundEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const answerInputRef = useRef<HTMLInputElement>(null);
   const inactivityCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-
   const generateEquation = (): { question: string; answer: number } => {
     const operations = ['+', '-', '*', '/'];
+    const op = operations[Math.floor(Math.random() * operations.length)];
     let question = '';
-    let answer = NaN;
-    let attempts = 0;
+    let answer = 0;
 
-    while (isNaN(answer) || !Number.isInteger(answer) || attempts > 100) {
-      attempts++;
-      const op = operations[Math.floor(Math.random() * operations.length)];
-      const num1 = Math.floor(Math.random() * (op === '*' || op === '/' ? 15 : 50)) + 1;
-      const num2 = Math.floor(Math.random() * (op === '*' || op === '/' ? 15 : 50)) + (op === '/' ? 1 : 0);
-
-      switch (op) {
-        case '+':
-          question = `${num1} + ${num2}`;
-          answer = num1 + num2;
-          break;
-        case '-':
-          const max = Math.max(num1, num2);
-          const min = Math.min(num1, num2);
-          question = `${max} - ${min}`;
-          answer = max - min;
-          break;
-        case '*':
-          question = `${num1} × ${num2}`;
-          answer = num1 * num2;
-          break;
-        case '/':
-          if (num2 === 0) continue;
-          const product = num1 * num2;
-          question = `${product} ÷ ${num2}`;
-          answer = num1;
-          break;
-      }
-    }
-    if (attempts > 100) {
-      console.warn("Could not generate valid equation after 100 attempts, using fallback.");
-      question = '1 + 1';
-      answer = 2;
+    switch (op) {
+      case '+':
+        // Hard Addition: 4-digit + 4-digit
+        const a1 = Math.floor(Math.random() * 9000) + 1000;
+        const a2 = Math.floor(Math.random() * 9000) + 1000;
+        question = `${a1} + ${a2}`;
+        answer = a1 + a2;
+        break;
+      case '-':
+        // Hard Subtraction: 5-digit - 4-digit
+        const s1 = Math.floor(Math.random() * 90000) + 10000;
+        const s2 = Math.floor(Math.random() * 9000) + 1000;
+        question = `${s1} - ${s2}`;
+        answer = s1 - s2;
+        break;
+      case '*':
+        // Hard Multiplication: 3-digit * 2-digit
+        const m1 = Math.floor(Math.random() * 900) + 100;
+        const m2 = Math.floor(Math.random() * 90) + 10;
+        question = `${m1} × ${m2}`;
+        answer = m1 * m2;
+        break;
+      case '/':
+        // Hard Division: 4 or 5 digit result from division
+        const divisor = Math.floor(Math.random() * 89) + 10; // 10-98
+        const quotient = Math.floor(Math.random() * 900) + 100; // 100-999
+        const dividend = divisor * quotient;
+        question = `${dividend} ÷ ${divisor}`;
+        answer = quotient;
+        break;
     }
     return { question, answer };
   };
 
   const updateFirestoreState = useCallback(async (updates: Partial<GameState>) => {
-      if (!roomCode) return;
+      if (!roomCode || !db) return;
       const roomDocRef = doc(db, 'gameRooms', roomCode);
       try {
-          console.log(`[updateFirestoreState] Updating Firestore (room: ${roomCode}) with:`, JSON.parse(JSON.stringify(updates))); // Clone for logging
           await updateDoc(roomDocRef, updates);
-          console.log(`[updateFirestoreState] Firestore update successful for room: ${roomCode}`);
       } catch (error) {
-          console.error(`[updateFirestoreState] Error updating Firestore for room ${roomCode}:`, error);
-          toast({
-              title: "Sync Error",
-              description: "Could not save changes to the game. Please check connection.",
-              variant: "destructive"
-          });
+          console.error(`[updateFirestoreState] Error updating Firestore:`, error);
       }
-  }, [roomCode, toast]);
+  }, [roomCode]);
 
   const currentPlayer = gameState?.players?.find(p => p.id === localPlayerInfo?.playerId);
   const isHost = currentPlayer?.isHost ?? false;
@@ -143,279 +136,187 @@ const GameRoomPage: NextPage = () => {
   }, [gameState?.isGameActive, isRoundEnding, gameState?.roundStartTime, calculateRoundTimeLeft]);
 
   useEffect(() => {
-    if (!roomCode) {
-        console.error("Room code is missing, cannot set up listener.");
-        toast({ title: 'Error', description: 'Invalid room code.', variant: 'destructive' });
-        router.push('/');
-        return;
-    }
+    if (!roomCode || !db) return;
 
     const savedPlayerInfo = getPlayerInfo();
     if (!localPlayerInfo && savedPlayerInfo) {
       setLocalPlayerInfo(savedPlayerInfo);
-       // If player info exists, try to set isJoining to false early,
-       // but it will be confirmed/overridden by Firestore state.
-       setIsJoining(false);
+      setIsJoining(false);
     }
 
-
-    console.log(`[Listener Setup] Setting up Firestore listener for room: ${roomCode}`);
     const roomDocRef = doc(db, 'gameRooms', roomCode);
 
     unsubscribeRef.current = onSnapshot(roomDocRef, (docSnap) => {
         if (docSnap.exists()) {
-            const data = docSnap.data() as Omit<GameState, 'roomCode'>;
-             const validatedData: GameState = {
-                 roomCode: roomCode,
-                 question: data.question ?? 'Error loading question',
-                 answer: typeof data.answer === 'number' ? data.answer : 0,
-                 players: Array.isArray(data.players) ? data.players.map(p => ({
-                      id: p?.id ?? '',
-                      name: p?.name ?? 'Unknown',
-                      score: typeof p?.score === 'number' ? p?.score : 0,
-                      isHost: typeof p?.isHost === 'boolean' ? p?.isHost : false,
-                      hasAnswered: typeof p?.hasAnswered === 'boolean' ? p?.hasAnswered : false,
-                      isCorrect: typeof p?.isCorrect === 'boolean' ? p.isCorrect : null,
-                      lastActive: p?.lastActive instanceof Timestamp ? p.lastActive : null,
-                 })).filter(p => p.id) : [],
-                 timeLeft: typeof data.timeLeft === 'number' ? data.timeLeft : 0,
-                 isGameActive: typeof data.isGameActive === 'boolean' ? data.isGameActive : false,
-                 currentRound: typeof data.currentRound === 'number' ? data.currentRound : 0,
-                 roundStartTime: data.roundStartTime instanceof Timestamp ? data.roundStartTime : null,
-                 createdAt: data.createdAt instanceof Timestamp ? data.createdAt : undefined,
-             };
-
-            setGameState(validatedData);
+            const data = docSnap.data() as GameState;
+            setGameState({ ...data, roomCode });
             setIsLoading(false);
 
-            const playerInfoFromStorage = getPlayerInfo(); // Re-check storage in case it was cleared
-            if (playerInfoFromStorage && validatedData.players.some(p => p.id === playerInfoFromStorage.playerId)) {
-                 // Player is in Firestore state, ensure localPlayerInfo is synced and isJoining is false
-                 if (!localPlayerInfo || localPlayerInfo.playerId !== playerInfoFromStorage.playerId) {
-                    setLocalPlayerInfo(playerInfoFromStorage);
-                 }
-                 setIsJoining(false);
-            } else if (playerInfoFromStorage) {
-                 // Player info in storage, but not in Firestore room state
-                 console.warn(`[onSnapshot] Player ${playerInfoFromStorage.playerId} in storage but not in Firestore room ${roomCode}. Might have been removed or game ended.`);
-                 // Potentially clear local info if user is not part of this room anymore.
-                 // However, be cautious to not clear if it's a temporary desync before join completes.
-                 // For now, we keep isJoining true if localPlayerInfo is not set OR mismatches what's in Firestore.
-                 setIsJoining(true);
-                 // Consider clearing if this state persists. For now, user will see join screen.
+            const pInfo = getPlayerInfo();
+            if (pInfo && data.players?.some(p => p.id === pInfo.playerId)) {
+                setIsJoining(false);
             } else {
-                // No player info in storage, user needs to join.
                 setIsJoining(true);
-                setLocalPlayerInfo(null);
             }
-
         } else {
-            console.warn(`[onSnapshot] Game room ${roomCode} document does not exist.`);
-            toast({ title: 'Room Not Found', description: 'This game room no longer exists or was deleted.', variant: 'destructive' });
-            if (unsubscribeRef.current) unsubscribeRef.current();
             clearPlayerInfo();
             router.push('/');
         }
     }, (error) => {
-        console.error(`[onSnapshot] Error listening to Firestore room ${roomCode}:`, error);
-        toast({ title: 'Connection Error', description: 'Lost connection to the game room.', variant: 'destructive' });
+        console.error(`[onSnapshot] Error:`, error);
         setIsLoading(false);
     });
 
     return () => {
-        if (unsubscribeRef.current) {
-            console.log(`[Listener Cleanup] Unsubscribing from Firestore listener for room: ${roomCode}`);
-            unsubscribeRef.current();
-            unsubscribeRef.current = null;
-        }
-         if (roundEndTimeoutRef.current) {
-            clearTimeout(roundEndTimeoutRef.current);
-            roundEndTimeoutRef.current = null;
-        }
+        if (unsubscribeRef.current) unsubscribeRef.current();
+        if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
     };
-  }, [roomCode, router, toast, localPlayerInfo]);
+  }, [roomCode, router, localPlayerInfo]);
 
-   const startGame = useCallback(async () => {
-       if (!gameState || !localPlayerInfo || !isHost || gameState.isGameActive || !gameState.players || gameState.players.length === 0) {
-            console.log(`[startGame] Aborted: gameState=${!!gameState}, localPlayerInfo=${!!localPlayerInfo}, isHost=${isHost}, isGameActive=${gameState?.isGameActive}, players=${gameState?.players?.length}`);
-            return;
-       }
-       console.log(`[startGame] Host (${localPlayerInfo?.playerId}) starting game in room ${roomCode}...`);
-       const { question, answer } = generateEquation();
-        const resetPlayers = gameState.players.map(p => ({
-           ...p,
-           score: 0,
-           hasAnswered: false,
-           isCorrect: null,
-           lastActive: serverTimestamp()
-       }));
-       const newState: Partial<GameState> = {
-           question,
-           answer,
-           timeLeft: ROUND_DURATION,
-           isGameActive: true,
-           currentRound: 1,
-           players: resetPlayers,
-           roundStartTime: serverTimestamp(),
-       };
-       await updateFirestoreState(newState);
-   }, [gameState, isHost, updateFirestoreState, roomCode, localPlayerInfo]);
+  const handleAddCustomQuestion = async () => {
+    if (!newQ.trim() || !newA.trim() || !gameState) return;
+    const ansNum = parseInt(newA, 10);
+    if (isNaN(ansNum)) return;
 
+    const updatedQuestions = [...(gameState.customQuestions || []), { question: newQ, answer: ansNum }];
+    await updateFirestoreState({ customQuestions: updatedQuestions });
+    setNewQ('');
+    setNewA('');
+  };
 
-   const nextQuestion = useCallback(async (triggeredByAllCorrect = false) => {
-       if (!gameState || !localPlayerInfo || !isHost || !gameState.isGameActive || isRoundEnding) {
-           console.log(`[nextQuestion] Aborted: gameState=${!!gameState}, localPlayerInfo=${!!localPlayerInfo}, isHost=${isHost}, isGameActive=${gameState?.isGameActive}, isRoundEnding=${isRoundEnding}`);
-           return;
-       }
-       console.log(`[nextQuestion] Host (${localPlayerInfo?.playerId}) advancing to next question in room ${roomCode} (triggeredByAllCorrect: ${triggeredByAllCorrect})...`);
+  const handleRemoveCustomQuestion = async (index: number) => {
+    if (!gameState?.customQuestions) return;
+    const updatedQuestions = gameState.customQuestions.filter((_, i) => i !== index);
+    await updateFirestoreState({ customQuestions: updatedQuestions });
+  };
 
-       if (roundEndTimeoutRef.current) {
-           clearTimeout(roundEndTimeoutRef.current);
-           roundEndTimeoutRef.current = null;
-       }
-       setIsRoundEnding(false);
+  const startGame = useCallback(async () => {
+    if (!gameState || !isHost || gameState.isGameActive) return;
 
-       const { question, answer } = generateEquation();
-       const nextRoundNumber = (gameState.currentRound || 0) + 1;
-       const resetPlayers = gameState.players.map(p => ({
-           ...p,
-           hasAnswered: false,
-           isCorrect: null,
-           lastActive: serverTimestamp()
-       }));
-       const newState: Partial<GameState> = {
-           question,
-           answer,
-           timeLeft: ROUND_DURATION,
-           currentRound: nextRoundNumber,
-           players: resetPlayers,
-           roundStartTime: serverTimestamp(),
-       };
-       await updateFirestoreState(newState);
-       setCurrentAnswer('');
-       setIsRoundEnding(false);
-   }, [gameState, isHost, updateFirestoreState, roomCode, localPlayerInfo, isRoundEnding]);
+    let nextQ: string;
+    let nextA: number;
+    let nextIdx = 0;
 
+    if (gameState.customQuestions && gameState.customQuestions.length > 0) {
+      nextQ = gameState.customQuestions[0].question;
+      nextA = gameState.customQuestions[0].answer;
+      nextIdx = 1;
+    } else {
+      const generated = generateEquation();
+      nextQ = generated.question;
+      nextA = generated.answer;
+    }
+
+    const resetPlayers = gameState.players.map(p => ({
+        ...p,
+        score: 0,
+        hasAnswered: false,
+        isCorrect: null,
+        lastActive: serverTimestamp()
+    }));
+
+    await updateFirestoreState({
+        question: nextQ,
+        answer: nextA,
+        timeLeft: ROUND_DURATION,
+        isGameActive: true,
+        currentRound: 1,
+        players: resetPlayers,
+        roundStartTime: serverTimestamp(),
+        currentQuestionIndex: nextIdx
+    });
+  }, [gameState, isHost, updateFirestoreState]);
+
+  const nextQuestion = useCallback(async () => {
+    if (!gameState || !isHost || !gameState.isGameActive || isRoundEnding) return;
+
+    setIsRoundEnding(false);
+    if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
+
+    let nextQ: string;
+    let nextA: number;
+    let nextIdx = gameState.currentQuestionIndex ?? 0;
+
+    if (gameState.customQuestions && nextIdx < gameState.customQuestions.length) {
+      nextQ = gameState.customQuestions[nextIdx].question;
+      nextA = gameState.customQuestions[nextIdx].answer;
+      nextIdx++;
+    } else {
+      const generated = generateEquation();
+      nextQ = generated.question;
+      nextA = generated.answer;
+    }
+
+    const resetPlayers = gameState.players.map(p => ({
+        ...p,
+        hasAnswered: false,
+        isCorrect: null,
+        lastActive: serverTimestamp()
+    }));
+
+    await updateFirestoreState({
+        question: nextQ,
+        answer: nextA,
+        timeLeft: ROUND_DURATION,
+        currentRound: (gameState.currentRound || 0) + 1,
+        players: resetPlayers,
+        roundStartTime: serverTimestamp(),
+        currentQuestionIndex: nextIdx
+    });
+    setCurrentAnswer('');
+    setIsRoundEnding(false);
+  }, [gameState, isHost, isRoundEnding, updateFirestoreState]);
 
   const endRound = useCallback(async () => {
-      if (!gameState || !localPlayerInfo || !isHost || isRoundEnding || !gameState.isGameActive) {
-          console.log(`[endRound] Aborted: gameState=${!!gameState}, localPlayerInfo=${!!localPlayerInfo}, isHost=${isHost}, isRoundEnding=${isRoundEnding}, isGameActive=${gameState?.isGameActive}`);
-          return;
-      }
-      console.log(`[endRound] Host (${localPlayerInfo?.playerId}) ending round ${gameState.currentRound} in room ${roomCode} - revealing results...`);
-      setIsRoundEnding(true);
+    if (!gameState || !isHost || isRoundEnding || !gameState.isGameActive) return;
+    setIsRoundEnding(true);
 
-       const roomDocRef = doc(db, 'gameRooms', roomCode);
-       try {
-           const currentDoc = await getDoc(roomDocRef);
-           if (!currentDoc.exists()) {
-                console.error("[endRound] Room document disappeared before update.");
-                setIsRoundEnding(false);
-                return;
-           }
-           const currentState = currentDoc.data() as GameState;
-            if (!currentState.isGameActive) {
-                console.warn("[endRound] Game became inactive before update could be applied.");
-                 setIsRoundEnding(false);
-                return;
-            }
+    const updatedPlayers = gameState.players.map(p => ({
+        ...p,
+        isCorrect: p.hasAnswered ? p.isCorrect : false,
+        lastActive: serverTimestamp()
+    }));
 
-           const updatedPlayers = currentState.players.map(p => ({
-               ...p,
-               isCorrect: p.hasAnswered ? p.isCorrect : false, // Mark unanswered as incorrect
-               lastActive: serverTimestamp()
-           }));
-           const newState: Partial<GameState> = {
-               players: updatedPlayers,
-               timeLeft: 0, // Explicitly set timeLeft to 0 as round is over
-           };
-            console.log(`[endRound] Updating Firestore state for results display:`, newState);
-           await updateFirestoreState(newState);
+    await updateFirestoreState({
+        players: updatedPlayers,
+        timeLeft: 0,
+    });
 
-           if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
-           console.log(`[endRound] Scheduling next question trigger in ${RESULTS_DISPLAY_DURATION}ms.`);
-           roundEndTimeoutRef.current = setTimeout(() => {
-               console.log(`[endRound] Results display timer finished for round ${currentState.currentRound}. Triggering next question.`);
-               nextQuestion(); // Call nextQuestion which now correctly handles its own state
-           }, RESULTS_DISPLAY_DURATION);
-
-       } catch (error) {
-            console.error(`[endRound] Error fetching or updating document during endRound for room ${roomCode}:`, error);
-            setIsRoundEnding(false); // Reset on error to allow retry or re-evaluation
-             toast({
-                title: "Error Ending Round",
-                description: "Could not finalize the round scores.",
-                variant: "destructive"
-            });
-       }
-  }, [gameState, isHost, isRoundEnding, updateFirestoreState, nextQuestion, roomCode, localPlayerInfo, toast]);
-
+    roundEndTimeoutRef.current = setTimeout(() => {
+        nextQuestion();
+    }, RESULTS_DISPLAY_DURATION);
+  }, [gameState, isHost, isRoundEnding, updateFirestoreState, nextQuestion]);
 
   useEffect(() => {
-    if (!isHost || !gameState || !gameState.isGameActive || isRoundEnding || !gameState.roundStartTime) {
-      return;
-    }
-    const checkTimeUp = () => {
-        const timeLeftNow = calculateRoundTimeLeft();
-        if (timeLeftNow <= 0) {
-            console.log(`[TimerCheck] Host (${localPlayerInfo?.playerId}) detected time is up for round ${gameState.currentRound}. Ending round.`);
+    if (!isHost || !gameState?.isGameActive || isRoundEnding || !gameState.roundStartTime) return;
+    const interval = setInterval(() => {
+        if (calculateRoundTimeLeft() <= 0) {
             endRound();
         }
-    };
-    const checkIntervalId = setInterval(checkTimeUp, 1000);
-    return () => clearInterval(checkIntervalId);
-  }, [isHost, gameState, isRoundEnding, endRound, calculateRoundTimeLeft, localPlayerInfo?.playerId]);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isHost, gameState, isRoundEnding, endRound, calculateRoundTimeLeft]);
 
-   useEffect(() => {
-       if (!isHost || !gameState || !gameState.isGameActive || isRoundEnding || !gameState.players || gameState.players.length === 0) {
-           return;
-       }
+  useEffect(() => {
+    if (!isHost || !gameState?.isGameActive || isRoundEnding || !gameState.players) return;
+    const allAnswered = gameState.players.every(p => p.hasAnswered);
+    const allCorrect = allAnswered && gameState.players.every(p => p.isCorrect === true);
 
-       const allAnswered = gameState.players.every(p => p.hasAnswered);
-       const allCorrect = allAnswered && gameState.players.every(p => p.isCorrect === true);
-
-       if (allCorrect) { // All players answered and all are correct
-           console.log(`[AllCorrectCheck] Host (${localPlayerInfo?.playerId}) detected all players answered correctly for round ${gameState.currentRound}. Advancing to next question.`);
-           // Clear any pending endRound timeout if all answered correctly before time ran out
-           if (roundEndTimeoutRef.current) {
-               clearTimeout(roundEndTimeoutRef.current);
-               roundEndTimeoutRef.current = null;
-           }
-           // Short delay before advancing to show "Correct!" briefly for everyone
-           const advanceTimeout = setTimeout(() => {
-               nextQuestion(true); // Pass flag indicating triggered by all correct
-           }, 500); // Reduced delay as results are implicitly shown by "Correct!" messages
-           return () => clearTimeout(advanceTimeout);
-       } else if (allAnswered) { // All players answered, but not all are correct
-           console.log(`[AllAnsweredCheck] Host (${localPlayerInfo?.playerId}) detected all players have answered for round ${gameState.currentRound}, but not all correct. Ending round.`);
-           // If all answered but not all correct, immediately end the round to show results.
-           if (roundEndTimeoutRef.current) {
-               clearTimeout(roundEndTimeoutRef.current);
-               roundEndTimeoutRef.current = null;
-           }
-           endRound(); // This will show results and then trigger nextQuestion after a delay
-       }
-   }, [gameState?.players, isHost, gameState?.isGameActive, gameState?.currentRound, isRoundEnding, localPlayerInfo?.playerId, nextQuestion, endRound]);
-
+    if (allCorrect) {
+        if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
+        const advanceTimeout = setTimeout(() => nextQuestion(), 800);
+        return () => clearTimeout(advanceTimeout);
+    } else if (allAnswered) {
+        if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
+        endRound();
+    }
+  }, [gameState?.players, isHost, gameState?.isGameActive, isRoundEnding, nextQuestion, endRound]);
 
   const handleJoinGame = async () => {
       const name = inputPlayerName.trim();
-      if (!name) {
-          toast({ title: "Please enter your name", variant: "destructive" });
-          return;
-      }
-      if (!gameState || isLoading) {
-          toast({ title: "Loading...", description: "Please wait for the game to load.", variant: "default" });
-          return;
-      }
-      if (gameState.players.some(p => p.name.toLowerCase() === name.toLowerCase())) {
-          toast({ title: "Name Taken", description: "That name is already in use. Please choose another.", variant: "destructive" });
-          return;
-      }
-
+      if (!name || !db) return;
       const playerId = generateId();
-      const shouldBeHost = isInitiallyHost && gameState.players.length === 0;
-      console.log(`[handleJoinGame] Attempting to join room ${roomCode} as ${name} (playerId: ${playerId}, shouldBeHost: ${shouldBeHost})`);
+      const shouldBeHost = isInitiallyHost && (gameState?.players?.length ?? 0) === 0;
 
       const newPlayer: Player = {
           id: playerId,
@@ -424,482 +325,117 @@ const GameRoomPage: NextPage = () => {
           isHost: shouldBeHost,
           hasAnswered: false,
           isCorrect: null,
-          lastActive: Timestamp.now() // Use client-side Firestore Timestamp for initial join
+          lastActive: Timestamp.now()
       };
 
       savePlayerInfo(playerId, name);
       setLocalPlayerInfo({ playerId, playerName: name });
 
-
       const roomDocRef = doc(db, 'gameRooms', roomCode);
       try {
-          console.log(`[handleJoinGame] Updating Firestore: Adding player ${JSON.stringify(newPlayer)} to room ${roomCode}`);
-           await updateDoc(roomDocRef, {
-              players: arrayUnion(newPlayer)
-           });
-          console.log(`[handleJoinGame] Successfully added player ${playerId} to Firestore room ${roomCode}`);
+          await updateDoc(roomDocRef, { players: arrayUnion(newPlayer) });
           toast({ title: `Welcome, ${name}!` });
-          // isJoining will be set to false by the onSnapshot listener
       } catch (error) {
-          console.error(`[handleJoinGame] Error adding player ${playerId} to Firestore room ${roomCode}:`, error);
-           clearPlayerInfo(); // Clear info if join fails server-side
-           setLocalPlayerInfo(null);
-           // setIsJoining(true); // Ensure join screen remains on error
-          toast({
-              title: "Error Joining Game",
-              description: "Could not add you to the room. Please try again.",
-              variant: "destructive",
-          });
+          console.error(error);
+          toast({ title: "Error Joining Game", variant: "destructive" });
       }
   };
 
   const handleAnswerSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!localPlayerInfo || !gameState || !gameState.isGameActive || currentAnswer === '' || isRoundEnding || roundTimeLeft <= 0) {
-           console.log(`[handleAnswerSubmit] Aborted: localPlayerInfo=${!!localPlayerInfo}, gameState=${!!gameState}, isGameActive=${gameState?.isGameActive}, currentAnswer=${currentAnswer}, isRoundEnding=${isRoundEnding}, roundTimeLeft=${roundTimeLeft}`);
-           return;
-      }
+      if (!localPlayerInfo || !gameState?.isGameActive || currentAnswer === '' || isRoundEnding || roundTimeLeft <= 0 || !db) return;
 
       const playerInState = gameState.players.find(p => p.id === localPlayerInfo.playerId);
-      if (!playerInState || (playerInState.hasAnswered && playerInState.isCorrect === true)) { // Player already answered correctly
-           console.log(`[handleAnswerSubmit] Aborted: playerInState=${!!playerInState}, hasAnsweredCorrectly=${playerInState?.hasAnswered && playerInState?.isCorrect}`);
-           return;
-      }
-      console.log(`[handleAnswerSubmit] Player ${localPlayerInfo.playerId} submitting answer: ${currentAnswer} for round ${gameState.currentRound}`);
+      if (!playerInState || (playerInState.hasAnswered && playerInState.isCorrect)) return;
 
       const submittedAnswer = parseInt(currentAnswer, 10);
-      if (isNaN(submittedAnswer)) {
-          toast({
-              title: "Invalid Answer",
-              description: "Please enter a valid number.",
-              variant: "destructive",
-              duration: 2000,
-          });
-          return;
-      }
       const isAnswerCorrect = submittedAnswer === gameState.answer;
       let scoreToAdd = 0;
-      // Only add score if this is the first time they are answering correctly for this round
-      if (isAnswerCorrect && !(playerInState.hasAnswered && playerInState.isCorrect === true)) {
-            const startTimeMillis = gameState.roundStartTime instanceof Timestamp
-                  ? gameState.roundStartTime.toMillis()
-                  : typeof gameState.roundStartTime === 'number'
-                  ? gameState.roundStartTime
-                  : Date.now();
+
+      if (isAnswerCorrect) {
+            const startTimeMillis = gameState.roundStartTime instanceof Timestamp ? gameState.roundStartTime.toMillis() : Date.now();
             const timeElapsed = Math.floor((Date.now() - startTimeMillis) / 1000);
-            const timeTaken = Math.min(ROUND_DURATION, Math.max(0, timeElapsed)); // Cap timeTaken at ROUND_DURATION
-            scoreToAdd = Math.max(5, (ROUND_DURATION - timeTaken) * 2 + 10); // Ensure at least 5 points
-            console.log(`[handleAnswerSubmit] Player ${localPlayerInfo.playerId} - Correct! ScoreToAdd: ${scoreToAdd}, TimeTaken: ${timeTaken}s`);
-      } else if (!isAnswerCorrect) {
-          console.log(`[handleAnswerSubmit] Player ${localPlayerInfo.playerId} - Incorrect.`);
-      } else {
-          console.log(`[handleAnswerSubmit] Player ${localPlayerInfo.playerId} - Already answered correctly, no additional score.`);
+            scoreToAdd = Math.max(5, (ROUND_DURATION - timeElapsed) * 2 + 10);
       }
 
       toast({
         title: isAnswerCorrect ? 'Correct!' : 'Incorrect',
-        description: isAnswerCorrect ? `+${scoreToAdd} points!` : (roundTimeLeft > 0 ? 'Try again!' : "Time's up!"),
         variant: isAnswerCorrect ? 'default' : 'destructive',
-        className: isAnswerCorrect ? 'bg-accent text-accent-foreground border-accent' : '',
-        duration: isAnswerCorrect ? 2000 : (roundTimeLeft > 0 ? 1500: 2000),
+        duration: 1500,
       });
 
        const roomDocRef = doc(db, 'gameRooms', roomCode);
        try {
-             const currentDoc = await getDoc(roomDocRef);
-             if (!currentDoc.exists()) throw new Error("Room document not found during answer submit");
-             const currentPlayers = (currentDoc.data() as GameState)?.players;
-             if (!Array.isArray(currentPlayers)) {
-                 throw new Error("Players data is missing or not an array in Firestore during answer submit");
-             }
-
-              const updatedPlayers = currentPlayers.map(p => {
+              const updatedPlayers = gameState.players.map(p => {
                  if (p.id === localPlayerInfo.playerId) {
-                    // If player answered correctly, their score is updated and isCorrect is set.
-                    // If they answered incorrectly, only hasAnswered and isCorrect are updated.
-                    // Score is only added if they are newly correct.
-                    const newScore = (p.score ?? 0) + scoreToAdd; // scoreToAdd is 0 if not newly correct
                     return {
                        ...p,
-                       score: newScore,
+                       score: (p.score ?? 0) + scoreToAdd,
                        hasAnswered: true,
-                       isCorrect: isAnswerCorrect, // Update correctness status
+                       isCorrect: isAnswerCorrect,
                        lastActive: serverTimestamp()
                       };
                  }
                  return p;
               });
-              console.log(`[handleAnswerSubmit] Updating Firestore players array for player ${localPlayerInfo.playerId}. New array:`, updatedPlayers);
               await updateDoc(roomDocRef, { players: updatedPlayers });
-              console.log(`[handleAnswerSubmit] Firestore update successful for player ${localPlayerInfo.playerId}`);
        } catch (error) {
-            console.error(`[handleAnswerSubmit] Error updating Firestore for player ${localPlayerInfo.playerId}'s answer:`, error);
-             toast({
-                title: "Error Submitting Answer",
-                description: "Could not save your answer. Please try again.",
-                variant: "destructive",
-            });
-            return; // Prevent clearing answer if submit failed
+            console.error(error);
        }
 
-      if (isAnswerCorrect) { // Clear input only if correct, allowing retry if incorrect
-          setCurrentAnswer('');
-      }
+      if (isAnswerCorrect) setCurrentAnswer('');
   };
 
   const handleLeaveGame = useCallback(async () => {
-    if (!localPlayerInfo || !gameState || !roomCode) {
-        console.warn("[handleLeaveGame] Aborted: Missing localPlayerInfo, gameState, or roomCode.");
-        clearPlayerInfo();
-        router.push('/');
-        return;
-    }
-
-    console.log(`[handleLeaveGame] Player ${localPlayerInfo.playerId} attempting to leave room ${roomCode}. isHost=${isHost}`);
-
-    if (unsubscribeRef.current) {
-        unsubscribeRef.current();
-        unsubscribeRef.current = null;
-    }
-    if (roundEndTimeoutRef.current) {
-        clearTimeout(roundEndTimeoutRef.current);
-        roundEndTimeoutRef.current = null;
-    }
-    if (inactivityCleanupIntervalRef.current) {
-        clearInterval(inactivityCleanupIntervalRef.current);
-        inactivityCleanupIntervalRef.current = null;
-    }
-
+    if (!localPlayerInfo || !roomCode || !db) return;
     const leavingPlayerId = localPlayerInfo.playerId;
     const roomDocRef = doc(db, 'gameRooms', roomCode);
 
-    const localPlayerNameForToast = localPlayerInfo.playerName;
     clearPlayerInfo();
-    setLocalPlayerInfo(null); // Optimistically clear local state
+    setLocalPlayerInfo(null);
 
     try {
         await runTransaction(db, async (transaction) => {
-            const currentDoc = await transaction.get(roomDocRef);
-            if (!currentDoc.exists()) {
-                console.warn(`[handleLeaveGame Tran] Room ${roomCode} already deleted or not found.`);
-                return;
-            }
-
-            const currentState = currentDoc.data() as GameState;
-            if (!Array.isArray(currentState?.players)) {
-                console.warn(`[handleLeaveGame Tran] Players data missing or invalid in room ${roomCode}.`);
-                return;
-            }
-
-            const leavingPlayerInFirestore = currentState.players.find(p => p.id === leavingPlayerId);
-            // No need to check if leavingPlayerInFirestore exists, filter will handle it.
-
-            let remainingPlayers = currentState.players.filter(p => p.id !== leavingPlayerId);
-            const wasHostInFirestore = leavingPlayerInFirestore?.isHost ?? false; // Check if the leaving player was host
+            const docSnap = await transaction.get(roomDocRef);
+            if (!docSnap.exists()) return;
+            const data = docSnap.data() as GameState;
+            const remainingPlayers = data.players.filter(p => p.id !== leavingPlayerId);
 
             if (remainingPlayers.length === 0) {
-                console.log(`[handleLeaveGame Tran] Last player (${leavingPlayerId}) leaving. Deleting room ${roomCode}.`);
                 transaction.delete(roomDocRef);
             } else {
-                let playersToUpdate = [...remainingPlayers];
-                if (wasHostInFirestore) {
-                    const currentHost = playersToUpdate.find(p => p.isHost);
-                    if (!currentHost && playersToUpdate.length > 0) {
-                        console.log(`[handleLeaveGame Tran] Host (${leavingPlayerId}) leaving. Assigning new host: ${playersToUpdate[0].id} (${playersToUpdate[0].name}).`);
-                        playersToUpdate = playersToUpdate.map((p, index) =>
-                            index === 0 ? { ...p, isHost: true, lastActive: serverTimestamp() } : { ...p, isHost: false, lastActive: serverTimestamp() } // Ensure only one host
-                        );
-                    } else {
-                         playersToUpdate = playersToUpdate.map(p => ({ ...p, lastActive: serverTimestamp()}));
-                    }
-                } else {
-                    playersToUpdate = playersToUpdate.map(p => ({ ...p, lastActive: serverTimestamp()}));
+                let playersToUpdate = remainingPlayers;
+                const wasHost = data.players.find(p => p.id === leavingPlayerId)?.isHost;
+                if (wasHost && !playersToUpdate.some(p => p.isHost)) {
+                    playersToUpdate = playersToUpdate.map((p, i) => i === 0 ? { ...p, isHost: true } : p);
                 }
                 transaction.update(roomDocRef, { players: playersToUpdate });
             }
         });
-        console.log(`[handleLeaveGame] Firestore transaction successful for player ${leavingPlayerId} leaving.`);
-        toast({ title: `You left the room, ${localPlayerNameForToast}.` });
-    } catch (error) {
-        console.error(`[handleLeaveGame] Error in transaction for player ${leavingPlayerId} or deleting room ${roomCode} from Firestore:`, error);
-        toast({
-            title: 'Error Leaving Room',
-            description: 'Could not update the room status. You have been removed locally.',
-            variant: 'destructive',
-        });
-    } finally {
-        router.push('/');
-    }
-  }, [localPlayerInfo, gameState, roomCode, isHost, router, toast, db]);
+    } catch (e) { console.error(e); }
+    router.push('/');
+  }, [localPlayerInfo, roomCode, router]);
 
-
-   const handleCopyLink = () => {
-    const link = window.location.href.split('?')[0];
-    navigator.clipboard.writeText(link).then(() => {
-      toast({ title: 'Link Copied!', description: 'Share it with your friends.' });
-    }).catch(err => {
-      console.error('Failed to copy link: ', err);
-      toast({ title: 'Failed to copy link', variant: 'destructive' });
-    });
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href.split('?')[0]);
+    toast({ title: 'Link Copied!' });
   };
 
-  const handleCopyCode = () => {
-     if (!roomCode) return;
-    navigator.clipboard.writeText(roomCode).then(() => {
-      toast({ title: 'Room Code Copied!' });
-    }).catch(err => {
-      console.error('Failed to copy code: ', err);
-      toast({ title: 'Failed to copy code', variant: 'destructive' });
-    });
-  };
+  if (isLoading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="animate-spin text-primary" /></div>;
 
-  useEffect(() => {
-    if (
-      gameState?.isGameActive &&
-      !isRoundEnding &&
-      roundTimeLeft > 0 &&
-      !isPlayerCorrect && // Only focus if player has not answered correctly
-      answerInputRef.current
-    ) {
-      const focusTimer = setTimeout(() => {
-         answerInputRef.current?.focus();
-         console.log("[FocusInput] Attempted to focus answer input.");
-      }, 50); // Small delay to ensure DOM is ready
-      return () => clearTimeout(focusTimer);
-    }
-  }, [gameState?.isGameActive, gameState?.currentRound, isRoundEnding, roundTimeLeft, isPlayerCorrect]);
-
-
-  // Host: Inactivity Cleanup Logic
-  useEffect(() => {
-    if (!isHost || !db || !roomCode) {
-        if (inactivityCleanupIntervalRef.current) {
-            clearInterval(inactivityCleanupIntervalRef.current);
-            inactivityCleanupIntervalRef.current = null;
-        }
-        return;
-    }
-
-    console.log(`[Host Cleanup] Setting up inactivity cleanup interval for room ${roomCode}. Interval: ${INACTIVITY_CLEANUP_INTERVAL}ms, Timeout: ${PLAYER_INACTIVITY_TIMEOUT}ms`);
-
-    const cleanupInactivePlayers = async () => {
-        console.log(`[Host Cleanup] Running cleanup for room ${roomCode} at ${new Date().toISOString()}`);
-        if (!db || !roomCode) { // Extra check as db/roomCode might change if component re-mounts or props change unexpectedly
-            console.warn("[Host Cleanup] DB or RoomCode became null/undefined during interval. Stopping.");
-            if (inactivityCleanupIntervalRef.current) clearInterval(inactivityCleanupIntervalRef.current);
-            return;
-        }
-        const roomDocRef = doc(db, 'gameRooms', roomCode);
-
-        try {
-            await runTransaction(db, async (transaction) => {
-                const currentDoc = await transaction.get(roomDocRef);
-                if (!currentDoc.exists()) {
-                    console.warn(`[Host Cleanup Tran] Room ${roomCode} not found during cleanup transaction. Stopping interval.`);
-                    if (inactivityCleanupIntervalRef.current) clearInterval(inactivityCleanupIntervalRef.current);
-                    return;
-                }
-
-                const currentState = currentDoc.data() as GameState;
-                if (!Array.isArray(currentState?.players)) { // Allow empty players array
-                    console.log(`[Host Cleanup Tran] No players in room ${roomCode} or invalid player data.`);
-                     if (currentState.players === undefined || currentState.players === null) { // If players field doesn't exist or is null
-                        if (!currentState.isGameActive) { // And game is not active
-                             console.log(`[Host Cleanup Tran] Room ${roomCode} has no player array and game not active. Deleting room.`);
-                             transaction.delete(roomDocRef);
-                             if (inactivityCleanupIntervalRef.current) clearInterval(inactivityCleanupIntervalRef.current);
-                        }
-                     }
-                    return;
-                }
-
-
-                const now = Date.now();
-                const activePlayers: Player[] = [];
-                let wasHostRemoved = false;
-                let removedPlayerCount = 0;
-
-                currentState.players.forEach(player => {
-                    const lastActiveTime = player.lastActive instanceof Timestamp ? player.lastActive.toMillis() : 0;
-                    if (lastActiveTime === 0 || (now - lastActiveTime) < PLAYER_INACTIVITY_TIMEOUT) { // Consider 0 as recently joined or active
-                        activePlayers.push(player);
-                    } else {
-                        console.log(`[Host Cleanup Tran] Player ${player.name} (${player.id}) in room ${roomCode} is inactive. Last active: ${new Date(lastActiveTime).toISOString()}. Removing.`);
-                        if (player.isHost) {
-                            wasHostRemoved = true;
-                        }
-                        removedPlayerCount++;
-                    }
-                });
-
-
-                if (activePlayers.length === 0 && currentState.players.length > 0) { // All existing players timed out
-                     console.log(`[Host Cleanup Tran] All players in room ${roomCode} became inactive. Deleting room.`);
-                     transaction.delete(roomDocRef);
-                     if (inactivityCleanupIntervalRef.current) clearInterval(inactivityCleanupIntervalRef.current);
-                     return;
-                }
-
-                if (removedPlayerCount > 0) { // Some players were removed
-                    let newPlayersArray = [...activePlayers];
-                    if (wasHostRemoved && newPlayersArray.length > 0) {
-                        const currentActiveHost = newPlayersArray.find(p => p.isHost);
-                        if (!currentActiveHost) { // Assign new host only if no host remains among active players
-                            console.log(`[Host Cleanup Tran] Original host removed due to inactivity in room ${roomCode}. Assigning new host: ${newPlayersArray[0].name} (${newPlayersArray[0].id}).`);
-                            newPlayersArray[0] = { ...newPlayersArray[0], isHost: true, lastActive: serverTimestamp() };
-                            for (let i = 1; i < newPlayersArray.length; i++) { // Ensure others are not host
-                                newPlayersArray[i] = { ...newPlayersArray[i], isHost: false, lastActive: serverTimestamp() };
-                            }
-                        } else { // A host already exists among active players, just update lastActive
-                             newPlayersArray = newPlayersArray.map(p => ({...p, lastActive: serverTimestamp()}));
-                        }
-                    } else if (newPlayersArray.length > 0) { // No host change, just update lastActive for remaining
-                        newPlayersArray = newPlayersArray.map(p => ({...p, lastActive: serverTimestamp()}));
-                    }
-
-                    console.log(`[Host Cleanup Tran] Updating players in room ${roomCode} after removing ${removedPlayerCount} inactive player(s). New player count: ${newPlayersArray.length}`);
-                    transaction.update(roomDocRef, { players: newPlayersArray });
-
-                } else if (activePlayers.length === 0 && currentState.players.length === 0 && !currentState.isGameActive) {
-                    // This case: room is empty, game not active, no one was "removed" in this run.
-                    // This can happen if the last player leaves normally, then cleanup runs.
-                    console.log(`[Host Cleanup Tran] Room ${roomCode} is confirmed empty and game not active. Deleting room.`);
-                    transaction.delete(roomDocRef);
-                    if (inactivityCleanupIntervalRef.current) clearInterval(inactivityCleanupIntervalRef.current);
-                }
-                else {
-                    console.log(`[Host Cleanup Tran] No inactive players found needing removal in room ${roomCode}. Active count: ${activePlayers.length}`);
-                }
-            });
-        } catch (error) {
-            console.error(`[Host Cleanup] Error during inactivity cleanup transaction for room ${roomCode}:`, error);
-            // Do not stop the interval on error, it might be a temporary issue
-        }
-    };
-
-    if (inactivityCleanupIntervalRef.current) {
-        clearInterval(inactivityCleanupIntervalRef.current);
-    }
-    inactivityCleanupIntervalRef.current = setInterval(cleanupInactivePlayers, INACTIVITY_CLEANUP_INTERVAL);
-
-    return () => {
-        if (inactivityCleanupIntervalRef.current) {
-            console.log(`[Host Cleanup] Clearing inactivity cleanup interval for room ${roomCode} on unmount/host change.`);
-            clearInterval(inactivityCleanupIntervalRef.current);
-            inactivityCleanupIntervalRef.current = null;
-        }
-    };
-  }, [isHost, db, roomCode]);
-
-
-  // Player: Update lastActive timestamp periodically
-  useEffect(() => {
-    if (!isHost && localPlayerInfo && gameState && gameState.players.some(p => p.id === localPlayerInfo.playerId)) {
-        const updateInterval = setInterval(async () => {
-            if (!db || !roomCode || !localPlayerInfo?.playerId) return;
-            const roomDocRef = doc(db, 'gameRooms', roomCode);
-            try {
-                // This is a direct update, not a transaction, as it's less critical and frequent.
-                // We only update this specific player's lastActive.
-                // This requires reading the players array, modifying one element, and writing it back.
-                // More efficient would be to update only the specific player field if Firestore supported it directly on array elements by ID.
-                const currentDoc = await getDoc(roomDocRef);
-                if (currentDoc.exists()) {
-                    const currentPlayers = (currentDoc.data() as GameState)?.players || [];
-                    const playerIndex = currentPlayers.findIndex(p => p.id === localPlayerInfo.playerId);
-
-                    if (playerIndex !== -1) {
-                        const updatedPlayers = [...currentPlayers];
-                        updatedPlayers[playerIndex] = { ...updatedPlayers[playerIndex], lastActive: serverTimestamp() };
-                        await updateDoc(roomDocRef, { players: updatedPlayers });
-                        // console.log(`[Player Activity] Player ${localPlayerInfo.playerId} updated lastActive in room ${roomCode}.`);
-                    } else {
-                        // console.warn(`[Player Activity] Player ${localPlayerInfo.playerId} not found in room ${roomCode} for activity update. May have been removed.`);
-                    }
-                }
-            } catch (error) {
-                console.error(`[Player Activity] Error updating lastActive for player ${localPlayerInfo.playerId} in room ${roomCode}:`, error);
-            }
-        }, PLAYER_INACTIVITY_TIMEOUT / 2); // Update more frequently than the timeout
-
-        return () => clearInterval(updateInterval);
-    }
-  }, [isHost, localPlayerInfo, gameState, roomCode, db]);
-
-
-
-  if (isLoading) {
-      return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Loading Room...</span></div>;
-  }
-
-  if (isJoining || !localPlayerInfo || (gameState && !gameState.players.some(p => p.id === localPlayerInfo?.playerId))) {
-     if (!gameState) { // Still waiting for initial gameState from Firestore
-        return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /> <span className="ml-2">Initializing Room Data...</span></div>;
-     }
-    // gameState is available, but local player is not in it or not yet set up
+  if (isJoining || !localPlayerInfo || !gameState?.players.some(p => p.id === localPlayerInfo?.playerId)) {
     return (
       <Card className="w-full max-w-md shadow-lg m-auto">
         <CardHeader>
-          <CardTitle className="text-center text-2xl">Join Room: {roomCode}</CardTitle>
-          <CardDescription className="text-center">Enter your name to join the game</CardDescription>
+          <CardTitle className="text-center">Join Room: {roomCode}</CardTitle>
+          <CardDescription className="text-center">Enter your name to join the challenge</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-           <Input
-             id="playerNameInput"
-             type="text"
-             placeholder="Your Name"
-             value={inputPlayerName}
-             onChange={(e) => setInputPlayerName(e.target.value)}
-             maxLength={15}
-             aria-label="Enter your name"
-             autoFocus
-             onKeyDown={(e) => e.key === 'Enter' && handleJoinGame()}
-           />
-           <Button onClick={handleJoinGame} className="w-full" disabled={!inputPlayerName.trim() || (gameState?.players.length ?? 0) >= 10}> {/* Example: Limit to 10 players */}
-             Join Game
-           </Button>
-           {(gameState?.players.length ?? 0) >= 10 && <p className="text-xs text-destructive text-center">Room is full.</p>}
+           <Input placeholder="Your Name" value={inputPlayerName} onChange={(e) => setInputPlayerName(e.target.value)} maxLength={15} onKeyDown={(e) => e.key === 'Enter' && handleJoinGame()} />
+           <Button onClick={handleJoinGame} className="w-full" disabled={!inputPlayerName.trim() || (gameState?.players.length ?? 0) >= 10}>Join Game</Button>
         </CardContent>
       </Card>
     );
-  }
-
-
-  if (!gameState && localPlayerInfo) { // Edge case: player info exists, but game state somehow lost after initial load
-     console.error("Render error: Game state missing but player info exists after loading/joining phase. This indicates a problem with Firestore subscription or data processing.");
-     // Adding a useEffect to attempt recovery or redirect.
-     useEffect(() => {
-        const timer = setTimeout(() => {
-           console.log("Redirecting home due to missing game state while player info exists.");
-            clearPlayerInfo(); // Clear potentially stale player info
-           router.push('/');
-        }, 3000); // Give a few seconds for state to potentially recover
-        return () => clearTimeout(timer);
-     }, [router]);
-
-     return (
-         <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
-            <XCircle className="h-12 w-12 text-destructive mb-4" />
-            <h1 className="text-2xl font-semibold text-destructive mb-2">Error Loading Game Data</h1>
-            <p className="text-muted-foreground">There was an issue loading game details. You will be redirected home shortly.</p>
-            <Button onClick={() => { clearPlayerInfo(); router.push('/'); }} variant="outline" className="mt-4">Go Home Now</Button>
-         </div>
-     );
-  }
-
-  // This check should ideally not be hit if isLoading and isJoining logic is correct.
-  // It's a fallback for unexpected null states.
-  if (!gameState || !localPlayerInfo) {
-      console.error("Critical Render Error: Game state or local player info is unexpectedly null/undefined. This should not happen after initial loading and joining phases.");
-       useEffect(() => {
-          const timer = setTimeout(() => {
-             console.log("Redirecting home due to critical render state error (gameState or localPlayerInfo null).");
-              clearPlayerInfo();
-             router.push('/');
-          }, 3000);
-          return () => clearTimeout(timer);
-       }, [router]);
-      return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-destructive" /> <span className="ml-2 text-destructive">Critical Application Error - Redirecting...</span></div>;
   }
 
   return (
@@ -908,178 +444,132 @@ const GameRoomPage: NextPage = () => {
          <CardHeader className="p-3">
              <div className="flex justify-between items-center mb-2">
                  <CardTitle className="text-xl flex items-center gap-1">
-                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-brain-circuit text-primary"><path d="M12 5a3 3 0 1 0-5.997.142"/><path d="M18 5a3 3 0 1 0-5.997.142"/><path d="M12 12a3 3 0 1 0-5.997.142"/><path d="M18 12a3 3 0 1 0-5.997.142"/><path d="M12 19a3 3 0 1 0-5.997.142"/><path d="M18 19a3 3 0 1 0-5.997.142"/><path d="M12 8V5"/><path d="M18 8V5"/><path d="M12 15v-3"/><path d="M18 15v-3"/><path d="M12 22v-3"/><path d="M18 22v-3"/><path d="m15 6-3-1-3 1"/><path d="m15 13-3-1-3 1"/><path d="m15 20-3-1-3 1"/><path d="M9 6.14A3 3 0 0 0 9 5"/><path d="M9 13.14A3 3 0 0 0 9 12"/><path d="M9 20.14A3 3 0 0 0 9 19"/><path d="M15 6.14A3 3 0 0 1 15 5"/><path d="M15 13.14A3 3 0 0 1 15 12"/><path d="M15 20.14A3 3 0 0 1 15 19"/></svg>
+                     <BrainCircuit className="text-primary h-5 w-5" />
                      Math Mania
                  </CardTitle>
                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" onClick={handleCopyCode} title="Copy Room Code">
+                    <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(roomCode)}>
                        <ClipboardCopy className="h-4 w-4 mr-1"/> {roomCode}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={handleCopyLink} title="Copy Invite Link">
+                    <Button variant="ghost" size="sm" onClick={handleCopyLink}>
                        <Share2 className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={handleLeaveGame} title="Leave Room" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                    <Button variant="ghost" size="sm" onClick={handleLeaveGame} className="text-destructive">
                        <LogOut className="h-4 w-4" />
                     </Button>
                  </div>
              </div>
              <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>Round: {gameState.currentRound > 0 ? gameState.currentRound : '-'}</span>
-                <div className="flex items-center gap-1" title="Time Remaining">
+                <div className="flex items-center gap-1">
                     <Clock className="h-4 w-4" />
-                    <span>{gameState.isGameActive && !isRoundEnding && gameState.roundStartTime ? `${roundTimeLeft}s` : '--'}</span>
+                    <span>{gameState.isGameActive && !isRoundEnding ? `${roundTimeLeft}s` : '--'}</span>
                 </div>
-                <div className="flex items-center gap-1" title="Players Online">
+                <div className="flex items-center gap-1">
                    <Users className="h-4 w-4" />
                    <span>{gameState.players?.length ?? 0}</span>
                 </div>
              </div>
-             {gameState.isGameActive && !isRoundEnding && roundTimeLeft > 0 && gameState.roundStartTime && (
-                <Progress value={(roundTimeLeft / ROUND_DURATION) * 100} className="w-full h-2 mt-2" aria-label={`Time left: ${roundTimeLeft} seconds`} />
+             {gameState.isGameActive && !isRoundEnding && roundTimeLeft > 0 && (
+                <Progress value={(roundTimeLeft / ROUND_DURATION) * 100} className="w-full h-2 mt-2" />
              )}
          </CardHeader>
         </Card>
 
-       <div className="flex-shrink-0 m-2 mt-0">
-           <Button onClick={() => setShowScoreboard(!showScoreboard)} variant="outline" size="sm" className="w-full mb-1" aria-expanded={showScoreboard}>
-               {showScoreboard ? 'Hide Scores' : 'Show Scores'} ({sortedPlayers.length} Player{sortedPlayers.length === 1 ? '' : 's'})
+        <div className="flex-shrink-0 m-2 mt-0">
+           <Button onClick={() => setShowScoreboard(!showScoreboard)} variant="outline" size="sm" className="w-full mb-1">
+               {showScoreboard ? 'Hide Scores' : 'Show Scores'}
            </Button>
            {showScoreboard && (
               <Card className="shadow rounded-lg">
                  <CardContent className="p-0">
-                    <ScrollArea className={`p-2 ${gameState.isGameActive ? 'h-[100px]' : 'h-[180px]'}`} aria-label="Scoreboard">
-                    {sortedPlayers.length > 0 ? sortedPlayers.map((player, index) => (
+                    <ScrollArea className={`p-2 ${gameState.isGameActive ? 'h-[100px]' : 'h-[180px]'}`}>
+                    {sortedPlayers.map((player, index) => (
                        <div key={player.id} className={`flex items-center justify-between p-1.5 rounded ${player.id === localPlayerInfo?.playerId ? 'bg-primary/10 font-semibold' : ''} text-sm mb-1`}>
-                          <div className="flex items-center gap-2 overflow-hidden min-w-0">
-                              <span className="font-normal w-5 text-right text-muted-foreground flex-shrink-0">{index + 1}.</span>
-                              <Avatar className="h-6 w-6 flex-shrink-0">
-                                <AvatarImage data-ai-hint="player avatar" src={`https://picsum.photos/seed/${player.id}/24/24`} alt={player.name} />
-                                <AvatarFallback>{player.name.substring(0, 1).toUpperCase()}</AvatarFallback>
+                          <div className="flex items-center gap-2">
+                              <span className="w-5 text-right text-muted-foreground">{index + 1}.</span>
+                              <Avatar className="h-6 w-6">
+                                <AvatarImage src={`https://picsum.photos/seed/${player.id}/24/24`} />
+                                <AvatarFallback>{player.name[0]}</AvatarFallback>
                               </Avatar>
-                              <span className="truncate flex-1 min-w-0">{player.name ?? 'Loading...'} {player.isHost ? <span className="text-xs text-primary/80">(Host)</span> : ''}</span>
+                              <span className="truncate max-w-[120px]">{player.name} {player.isHost && '👑'}</span>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                                {(gameState.isGameActive || isRoundEnding) && player.hasAnswered !== undefined && ( // Check hasAnswered is defined
-                                     player.hasAnswered ? ( // Player has submitted an answer
-                                         (isRoundEnding || (roundTimeLeft <= 0 && gameState.roundStartTime) || player.isCorrect === true) ? ( // Round ended OR time up OR they are correct (show result)
-                                             player.isCorrect === true ?
-                                                <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" title="Correct"/> :
-                                                player.isCorrect === false ?
-                                                <XCircle className="h-4 w-4 text-destructive flex-shrink-0" title="Incorrect"/> :
-                                                // Fallback if isCorrect is null but hasAnswered is true (should not happen with current logic)
-                                                <XCircle className="h-4 w-4 text-muted-foreground opacity-60 flex-shrink-0" title="Result Pending/Error" />
-                                         ) : ( // Player answered, round active, time left, and they are not yet marked correct (implies incorrect, retrying)
-                                             <Clock className="h-4 w-4 text-muted-foreground animate-pulse flex-shrink-0" title="Answered (Incorrect - Retrying)" />
-                                         )
-                                     ) : ( // Player has NOT answered
-                                         (isRoundEnding || (roundTimeLeft <= 0 && gameState.roundStartTime)) ? // Round ended or time up
-                                            <XCircle className="h-4 w-4 text-muted-foreground opacity-50 flex-shrink-0" title="Did not answer"/> :
-                                            null // Round active, time left, not answered - show nothing
-                                     )
+                          <div className="flex items-center gap-2">
+                                {gameState.isGameActive && player.hasAnswered && (
+                                     player.isCorrect === true ? <CheckCircle className="h-4 w-4 text-accent" /> : <XCircle className="h-4 w-4 text-destructive" />
                                 )}
-                                <span className="font-mono font-semibold w-10 text-right flex-shrink-0">{player.score ?? 0}</span>
+                                <span className="font-mono font-semibold w-10 text-right">{player.score}</span>
                           </div>
                        </div>
-                    )) : (
-                        <p className="text-center text-muted-foreground p-4 text-sm">Waiting for players...</p>
-                    )}
+                    ))}
                     </ScrollArea>
                  </CardContent>
               </Card>
            )}
         </div>
 
-        {/* Ad Banner - Smaller for game screen */}
-        <AdBanner className="mx-2 my-1" style={{minHeight: '50px'}} />
-
-
         <div className="flex-grow flex flex-col justify-center items-center p-4 space-y-4 m-2 mt-0">
             {gameState.isGameActive ? (
                 <>
                     <Card className="w-full bg-card shadow-lg text-center p-6">
                         <CardDescription className="mb-2">Question {gameState.currentRound}</CardDescription>
-                        <CardTitle className="text-4xl font-mono tracking-wider">
-                           {/* Show full equation if round is ending/over, or if player is correct */}
-                           {(isRoundEnding || (roundTimeLeft <= 0 && gameState.roundStartTime) || isPlayerCorrect) ? `${gameState.question} = ${gameState.answer}` : `${gameState.question} = ?`}
+                        <CardTitle className="text-3xl font-mono">
+                           {(isRoundEnding || isPlayerCorrect) ? `${gameState.question} = ${gameState.answer}` : `${gameState.question} = ?`}
                         </CardTitle>
                     </Card>
 
                     <form onSubmit={handleAnswerSubmit} className="w-full space-y-2">
-                        <Input
-                            ref={answerInputRef}
-                            type="number" // Using number type for better mobile keyboards, but still validating
-                            inputMode="numeric" // Suggests numeric keyboard
-                            pattern="[0-9-]*" // Allows digits and hyphen for negative numbers
-                            placeholder="Your Answer"
-                            value={currentAnswer}
-                            onChange={(e) => setCurrentAnswer(e.target.value.replace(/[^0-9-]/g, ''))} // Filter non-numeric/non-hyphen
-                            className="text-center text-2xl h-14"
-                            disabled={isPlayerCorrect || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding} // Disable if correct, or time up, or round ending
-                            aria-label="Enter your answer"
-                            aria-disabled={isPlayerCorrect || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
-                        />
-                        <Button
-                            type="submit"
-                            className="w-full text-lg py-3"
-                            disabled={isPlayerCorrect || currentAnswer === '' || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
-                            aria-disabled={isPlayerCorrect || currentAnswer === '' || (roundTimeLeft <= 0 && gameState.roundStartTime) || isRoundEnding}
-                         >
+                        <Input ref={answerInputRef} type="number" placeholder="Your Answer" value={currentAnswer} onChange={(e) => setCurrentAnswer(e.target.value)} className="text-center text-2xl h-14" disabled={isPlayerCorrect || isRoundEnding} />
+                        <Button type="submit" className="w-full text-lg py-3" disabled={isPlayerCorrect || currentAnswer === '' || isRoundEnding}>
                             {isPlayerCorrect ? 'Correct!' : (hasPlayerAnswered ? 'Submit Again' : 'Submit Answer')}
                          </Button>
                     </form>
-                     {isRoundEnding && ( // Round is ending, results are being compiled/shown briefly
-                        <p className="text-center text-muted-foreground animate-pulse">Revealing results... Next round soon!</p>
-                     )}
-                     {isPlayerCorrect && !isRoundEnding && roundTimeLeft > 0 && ( // Player is correct, round active
-                         <p className="text-center text-accent font-medium">Correct! Waiting for others...</p>
-                     )}
-                     {hasPlayerAnswered && !isPlayerCorrect && !isRoundEnding && roundTimeLeft > 0 && ( // Player answered, incorrect, round active, time left
-                         <p className="text-center text-destructive">Incorrect. Keep trying!</p>
-                     )}
-                     {/* Message for when time is up, but round hasn't officially "ended" yet (results not shown) */}
-                     {!isPlayerCorrect && roundTimeLeft <= 0 && gameState.roundStartTime && !isRoundEnding && (
-                         <p className="text-center text-destructive font-medium">Time's up! Answer was: {gameState.answer}</p>
-                     )}
                 </>
             ) : (
-                 <Card className="w-full bg-card shadow-lg text-center p-6 flex flex-col items-center justify-center min-h-[200px]">
-                     {gameState.players && gameState.players.length > 0 ? (
-                         isHost ? (
-                             <>
-                                 <CardTitle className="mb-4 text-xl">Ready to Start?</CardTitle>
-                                 <CardDescription className="mb-4 text-sm">Waiting for players to join. Click start when ready!</CardDescription>
-                                 <Button onClick={startGame} className="text-lg py-3 px-6" disabled={gameState.players.length < 1}>
-                                     Start Game ({gameState.players.length} player{gameState.players.length === 1 ? '' : 's'})
-                                 </Button>
-                             </>
-                         ) : (
-                             <>
-                                <CardTitle className="text-xl mb-2">Waiting for the host</CardTitle>
-                                <Loader2 className="h-6 w-6 animate-spin text-primary mb-4"/>
-                                <CardDescription className="text-sm">The host ({gameState.players.find(p=>p.isHost)?.name || '...'}) will start the game soon.</CardDescription>
-                             </>
-                         )
-                     ) : (
-                          <>
-                            <CardTitle className="text-xl mb-4">Waiting for players<span className="animate-pulse">...</span></CardTitle>
-                            <Loader2 className="h-6 w-6 animate-spin text-primary mb-4"/>
-                            <CardDescription className="mt-2 text-xs text-muted-foreground">
-                                Share the Room Code or Link below!
-                            </CardDescription>
-                          </>
-                     )}
-                      <CardDescription className="mt-4 text-xs text-muted-foreground">
-                        Room Code: <strong className="text-foreground">{roomCode}</strong>
-                        <Button variant="link" size="sm" onClick={handleCopyCode} className="p-1 h-auto ml-1">Copy Code</Button>
-                        <Button variant="link" size="sm" onClick={handleCopyLink} className="p-1 h-auto ml-1">Copy Link</Button>
-                      </CardDescription>
+                 <Card className="w-full bg-card shadow-lg p-4">
+                    {isHost ? (
+                        <Tabs defaultValue="lobby" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="lobby">Lobby</TabsTrigger>
+                                <TabsTrigger value="custom">Custom Pool</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="lobby" className="space-y-4 pt-4 text-center">
+                                <CardTitle>Ready to Start?</CardTitle>
+                                <CardDescription>All set! {gameState.customQuestions?.length ? `${gameState.customQuestions.length} custom questions added.` : 'Using random hard questions.'}</CardDescription>
+                                <Button onClick={startGame} className="w-full text-lg">Start Game</Button>
+                            </TabsContent>
+                            <TabsContent value="custom" className="space-y-4 pt-2">
+                                <div className="space-y-2">
+                                    <div className="flex gap-2">
+                                        <Input placeholder="Question (e.g. 5+5)" value={newQ} onChange={e => setNewQ(e.target.value)} />
+                                        <Input type="number" placeholder="Ans" className="w-20" value={newA} onChange={e => setNewA(e.target.value)} />
+                                        <Button size="icon" onClick={handleAddCustomQuestion}><Plus /></Button>
+                                    </div>
+                                    <ScrollArea className="h-[150px] border rounded-md p-2">
+                                        {(gameState.customQuestions || []).map((q, i) => (
+                                            <div key={i} className="flex justify-between items-center text-sm p-1 border-b last:border-0">
+                                                <span>{q.question} = {q.answer}</span>
+                                                <Button variant="ghost" size="sm" onClick={() => handleRemoveCustomQuestion(i)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                                            </div>
+                                        ))}
+                                        {(!gameState.customQuestions || gameState.customQuestions.length === 0) && <p className="text-center text-muted-foreground text-xs p-4">No custom questions. Random will be used.</p>}
+                                    </ScrollArea>
+                                </div>
+                            </TabsContent>
+                        </Tabs>
+                    ) : (
+                        <div className="text-center space-y-4 py-8">
+                            <CardTitle>Waiting for host...</CardTitle>
+                            <Loader2 className="animate-spin m-auto text-primary" />
+                            <CardDescription>The host will start the challenge shortly.</CardDescription>
+                        </div>
+                    )}
                  </Card>
             )}
         </div>
+        <AdBanner className="mx-2 my-1" style={{minHeight: '60px'}} />
     </div>
   );
 };
 
 export default GameRoomPage;
-
-    

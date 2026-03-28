@@ -1,5 +1,10 @@
 // src/types/game.ts
-import type { Timestamp } from 'firebase/firestore'; // Import Timestamp type
+import type { Timestamp } from 'firebase/firestore';
+
+export interface CustomQuestion {
+  question: string;
+  answer: number;
+}
 
 export interface Player {
   id: string;
@@ -8,7 +13,7 @@ export interface Player {
   isHost?: boolean;
   hasAnswered?: boolean;
   isCorrect?: boolean | null;
-  lastActive?: Timestamp | null; // Timestamp of the player's last known activity
+  lastActive?: Timestamp | null;
 }
 
 export interface GameState {
@@ -21,4 +26,6 @@ export interface GameState {
   currentRound: number;
   roundStartTime: Timestamp | number | null;
   createdAt?: Timestamp;
+  customQuestions?: CustomQuestion[];
+  currentQuestionIndex?: number;
 }
