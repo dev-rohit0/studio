@@ -138,9 +138,6 @@ const HomePage: NextPage = () => {
                 <Activity className="h-12 w-12 text-primary animate-pulse" />
               </div>
             )}
-            <CardTitle className="text-4xl font-black tracking-tight text-primary">
-              MathPulse
-            </CardTitle>
           </div>
           <CardDescription className="text-base font-medium">Fastest Finger First Challenge!</CardDescription>
         </CardHeader>
