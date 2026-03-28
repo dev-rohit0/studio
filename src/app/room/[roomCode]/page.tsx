@@ -6,13 +6,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, XCircle, ClipboardCopy, Users, Share2, Clock, LogOut, Loader2, Plus, Trash2, BrainCircuit } from 'lucide-react';
+import { CheckCircle, XCircle, ClipboardCopy, Users, Share2, Clock, LogOut, Loader2, Plus, Trash2, BrainCircuit, Trophy, Medal, Award } from 'lucide-react';
 import { getPlayerInfo, savePlayerInfo, clearPlayerInfo, generateId } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, arrayUnion, getDoc, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
@@ -21,8 +21,6 @@ import AdBanner from '@/components/ads/AdBanner';
 
 const ROUND_DURATION = 30;
 const RESULTS_DISPLAY_DURATION = 3000;
-const INACTIVITY_CLEANUP_INTERVAL = 30000;
-const PLAYER_INACTIVITY_TIMEOUT = 60000;
 
 const GameRoomPage: NextPage = () => {
   const params = useParams();
@@ -43,12 +41,29 @@ const GameRoomPage: NextPage = () => {
   
   // Custom question form state
   const [newQ, setNewQ] = useState('');
-  const [newA, setNewA] = useState('');
+  const [autoCalcAns, setAutoCalcAns] = useState<number | null>(null);
 
   const roundEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const answerInputRef = useRef<HTMLInputElement>(null);
-  const inactivityCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const evaluateExpression = (expr: string): number | null => {
+    const sanitized = expr.replace(/x/g, '*').replace(/÷/g, '/').replace(/[^-+*/().0-9 ]/g, '');
+    try {
+      if (!sanitized.trim()) return null;
+      // Basic safety check: ensure it doesn't look like anything but math
+      if (/[^0-9+\-*/(). ]/.test(sanitized)) return null;
+      const result = new Function(`return ${sanitized}`)();
+      return typeof result === 'number' && isFinite(result) ? Math.round(result * 100) / 100 : null;
+    } catch {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const ans = evaluateExpression(newQ);
+    setAutoCalcAns(ans);
+  }, [newQ]);
 
   const generateEquation = (): { question: string; answer: number } => {
     const operations = ['+', '-', '*', '/'];
@@ -58,30 +73,26 @@ const GameRoomPage: NextPage = () => {
 
     switch (op) {
       case '+':
-        // Hard Addition: 4-digit + 4-digit
         const a1 = Math.floor(Math.random() * 9000) + 1000;
         const a2 = Math.floor(Math.random() * 9000) + 1000;
         question = `${a1} + ${a2}`;
         answer = a1 + a2;
         break;
       case '-':
-        // Hard Subtraction: 5-digit - 4-digit
         const s1 = Math.floor(Math.random() * 90000) + 10000;
         const s2 = Math.floor(Math.random() * 9000) + 1000;
         question = `${s1} - ${s2}`;
         answer = s1 - s2;
         break;
       case '*':
-        // Hard Multiplication: 3-digit * 2-digit
         const m1 = Math.floor(Math.random() * 900) + 100;
         const m2 = Math.floor(Math.random() * 90) + 10;
         question = `${m1} × ${m2}`;
         answer = m1 * m2;
         break;
       case '/':
-        // Hard Division: 4 or 5 digit result from division
-        const divisor = Math.floor(Math.random() * 89) + 10; // 10-98
-        const quotient = Math.floor(Math.random() * 900) + 100; // 100-999
+        const divisor = Math.floor(Math.random() * 89) + 10;
+        const quotient = Math.floor(Math.random() * 900) + 100;
         const dividend = divisor * quotient;
         question = `${dividend} ÷ ${divisor}`;
         answer = quotient;
@@ -102,7 +113,6 @@ const GameRoomPage: NextPage = () => {
 
   const currentPlayer = gameState?.players?.find(p => p.id === localPlayerInfo?.playerId);
   const isHost = currentPlayer?.isHost ?? false;
-  const hasPlayerAnswered = currentPlayer?.hasAnswered ?? false;
   const isPlayerCorrect = currentPlayer?.isCorrect === true;
   const sortedPlayers = gameState?.players ? [...gameState.players].sort((a, b) => b.score - a.score) : [];
 
@@ -174,14 +184,11 @@ const GameRoomPage: NextPage = () => {
   }, [roomCode, router, localPlayerInfo]);
 
   const handleAddCustomQuestion = async () => {
-    if (!newQ.trim() || !newA.trim() || !gameState) return;
-    const ansNum = parseInt(newA, 10);
-    if (isNaN(ansNum)) return;
+    if (!newQ.trim() || autoCalcAns === null || !gameState) return;
 
-    const updatedQuestions = [...(gameState.customQuestions || []), { question: newQ, answer: ansNum }];
+    const updatedQuestions = [...(gameState.customQuestions || []), { question: newQ, answer: autoCalcAns }];
     await updateFirestoreState({ customQuestions: updatedQuestions });
     setNewQ('');
-    setNewA('');
   };
 
   const handleRemoveCustomQuestion = async (index: number) => {
@@ -189,6 +196,14 @@ const GameRoomPage: NextPage = () => {
     const updatedQuestions = gameState.customQuestions.filter((_, i) => i !== index);
     await updateFirestoreState({ customQuestions: updatedQuestions });
   };
+
+  const endGame = useCallback(async () => {
+    await updateFirestoreState({
+        isGameActive: false,
+        isGameOver: true,
+        timeLeft: 0
+    });
+  }, [updateFirestoreState]);
 
   const startGame = useCallback(async () => {
     if (!gameState || !isHost || gameState.isGameActive) return;
@@ -220,6 +235,7 @@ const GameRoomPage: NextPage = () => {
         answer: nextA,
         timeLeft: ROUND_DURATION,
         isGameActive: true,
+        isGameOver: false,
         currentRound: 1,
         players: resetPlayers,
         roundStartTime: serverTimestamp(),
@@ -236,6 +252,12 @@ const GameRoomPage: NextPage = () => {
     let nextQ: string;
     let nextA: number;
     let nextIdx = gameState.currentQuestionIndex ?? 0;
+
+    // Check if we finished custom questions
+    if (gameState.customQuestions && gameState.customQuestions.length > 0 && nextIdx >= gameState.customQuestions.length) {
+      endGame();
+      return;
+    }
 
     if (gameState.customQuestions && nextIdx < gameState.customQuestions.length) {
       nextQ = gameState.customQuestions[nextIdx].question;
@@ -265,7 +287,7 @@ const GameRoomPage: NextPage = () => {
     });
     setCurrentAnswer('');
     setIsRoundEnding(false);
-  }, [gameState, isHost, isRoundEnding, updateFirestoreState]);
+  }, [gameState, isHost, isRoundEnding, updateFirestoreState, endGame]);
 
   const endRound = useCallback(async () => {
     if (!gameState || !isHost || isRoundEnding || !gameState.isGameActive) return;
@@ -421,6 +443,15 @@ const GameRoomPage: NextPage = () => {
     toast({ title: 'Link Copied!' });
   };
 
+  const handleResetLobby = async () => {
+    await updateFirestoreState({
+        isGameOver: false,
+        isGameActive: false,
+        currentRound: 0,
+        players: gameState?.players.map(p => ({ ...p, score: 0, hasAnswered: false, isCorrect: null })) || []
+    });
+  };
+
   if (isLoading) return <div className="flex items-center justify-center min-h-screen"><Loader2 className="animate-spin text-primary" /></div>;
 
   if (isJoining || !localPlayerInfo || !gameState?.players.some(p => p.id === localPlayerInfo?.playerId)) {
@@ -435,6 +466,84 @@ const GameRoomPage: NextPage = () => {
            <Button onClick={handleJoinGame} className="w-full" disabled={!inputPlayerName.trim() || (gameState?.players.length ?? 0) >= 10}>Join Game</Button>
         </CardContent>
       </Card>
+    );
+  }
+
+  // Final Results Screen
+  if (gameState.isGameOver) {
+    const top3 = sortedPlayers.slice(0, 3);
+    return (
+      <div className="flex flex-col h-screen w-full max-w-md bg-secondary p-4">
+        <Card className="w-full shadow-xl rounded-2xl overflow-hidden border-none bg-gradient-to-b from-primary/10 to-card">
+          <CardHeader className="text-center pb-2">
+            <Trophy className="h-16 w-16 text-yellow-500 mx-auto mb-2 animate-bounce" />
+            <CardTitle className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-600 to-yellow-400">Final Results</CardTitle>
+            <CardDescription>Amazing performance by the top candidates!</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex justify-around items-end pt-8 pb-4">
+                {/* 2nd Place */}
+                {top3[1] && (
+                    <div className="flex flex-col items-center gap-2">
+                         <div className="relative">
+                            <Avatar className="h-16 w-16 border-4 border-slate-300">
+                                <AvatarImage src={`https://picsum.photos/seed/${top3[1].id}/64/64`} />
+                                <AvatarFallback>{top3[1].name[0]}</AvatarFallback>
+                            </Avatar>
+                            <div className="absolute -bottom-2 -right-2 bg-slate-400 text-white rounded-full p-1 shadow-lg">
+                                <Medal className="h-5 w-5" />
+                            </div>
+                         </div>
+                         <span className="font-bold text-slate-700">{top3[1].name}</span>
+                         <div className="bg-slate-300 h-20 w-16 rounded-t-lg flex items-center justify-center text-xl font-bold text-slate-600 shadow-inner">2nd</div>
+                         <span className="text-sm font-mono">{top3[1].score} pts</span>
+                    </div>
+                )}
+                {/* 1st Place */}
+                {top3[0] && (
+                    <div className="flex flex-col items-center gap-2 -translate-y-4">
+                         <div className="relative">
+                            <Avatar className="h-20 w-20 border-4 border-yellow-400 shadow-yellow-200 shadow-lg">
+                                <AvatarImage src={`https://picsum.photos/seed/${top3[0].id}/80/80`} />
+                                <AvatarFallback>{top3[0].name[0]}</AvatarFallback>
+                            </Avatar>
+                            <div className="absolute -bottom-2 -right-2 bg-yellow-500 text-white rounded-full p-1 shadow-lg">
+                                <Trophy className="h-6 w-6" />
+                            </div>
+                         </div>
+                         <span className="font-bold text-yellow-700">{top3[0].name}</span>
+                         <div className="bg-yellow-400 h-28 w-20 rounded-t-lg flex items-center justify-center text-2xl font-bold text-yellow-800 shadow-inner">1st</div>
+                         <span className="text-sm font-mono font-bold">{top3[0].score} pts</span>
+                    </div>
+                )}
+                {/* 3rd Place */}
+                {top3[2] && (
+                    <div className="flex flex-col items-center gap-2">
+                         <div className="relative">
+                            <Avatar className="h-16 w-16 border-4 border-amber-600">
+                                <AvatarImage src={`https://picsum.photos/seed/${top3[2].id}/64/64`} />
+                                <AvatarFallback>{top3[2].name[0]}</AvatarFallback>
+                            </Avatar>
+                            <div className="absolute -bottom-2 -right-2 bg-amber-700 text-white rounded-full p-1 shadow-lg">
+                                <Award className="h-5 w-5" />
+                            </div>
+                         </div>
+                         <span className="font-bold text-amber-800">{top3[2].name}</span>
+                         <div className="bg-amber-600/70 h-16 w-16 rounded-t-lg flex items-center justify-center text-xl font-bold text-white shadow-inner">3rd</div>
+                         <span className="text-sm font-mono">{top3[2].score} pts</span>
+                    </div>
+                )}
+            </div>
+          </CardContent>
+          <CardFooter className="flex flex-col gap-2 pt-0">
+             {isHost && (
+                <Button onClick={handleResetLobby} className="w-full">Return to Lobby</Button>
+             )}
+             <Button variant="outline" onClick={handleLeaveGame} className="w-full">Exit Room</Button>
+          </CardFooter>
+        </Card>
+        <AdBanner className="mt-auto" />
+      </div>
     );
   }
 
@@ -521,7 +630,7 @@ const GameRoomPage: NextPage = () => {
                     <form onSubmit={handleAnswerSubmit} className="w-full space-y-2">
                         <Input ref={answerInputRef} type="number" placeholder="Your Answer" value={currentAnswer} onChange={(e) => setCurrentAnswer(e.target.value)} className="text-center text-2xl h-14" disabled={isPlayerCorrect || isRoundEnding} />
                         <Button type="submit" className="w-full text-lg py-3" disabled={isPlayerCorrect || currentAnswer === '' || isRoundEnding}>
-                            {isPlayerCorrect ? 'Correct!' : (hasPlayerAnswered ? 'Submit Again' : 'Submit Answer')}
+                            {isPlayerCorrect ? 'Correct!' : 'Submit Answer'}
                          </Button>
                     </form>
                 </>
@@ -541,9 +650,13 @@ const GameRoomPage: NextPage = () => {
                             <TabsContent value="custom" className="space-y-4 pt-2">
                                 <div className="space-y-2">
                                     <div className="flex gap-2">
-                                        <Input placeholder="Question (e.g. 5+5)" value={newQ} onChange={e => setNewQ(e.target.value)} />
-                                        <Input type="number" placeholder="Ans" className="w-20" value={newA} onChange={e => setNewA(e.target.value)} />
-                                        <Button size="icon" onClick={handleAddCustomQuestion}><Plus /></Button>
+                                        <div className="flex-grow flex flex-col">
+                                            <Input placeholder="Expr (e.g. 25 * 4)" value={newQ} onChange={e => setNewQ(e.target.value)} />
+                                            {autoCalcAns !== null && (
+                                                <span className="text-[10px] text-accent font-bold mt-0.5 ml-1">Ans: {autoCalcAns}</span>
+                                            )}
+                                        </div>
+                                        <Button size="icon" onClick={handleAddCustomQuestion} disabled={autoCalcAns === null}><Plus /></Button>
                                     </div>
                                     <ScrollArea className="h-[150px] border rounded-md p-2">
                                         {(gameState.customQuestions || []).map((q, i) => (

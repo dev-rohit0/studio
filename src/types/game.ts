@@ -23,6 +23,7 @@ export interface GameState {
   players: Player[];
   timeLeft: number;
   isGameActive: boolean;
+  isGameOver?: boolean;
   currentRound: number;
   roundStartTime: Timestamp | number | null;
   createdAt?: Timestamp;
