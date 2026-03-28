@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle, ClipboardCopy, Users, Share2, Clock, LogOut, Loader2, Plus, Trash2, BrainCircuit, Trophy, Medal, Award } from 'lucide-react';
@@ -51,7 +51,6 @@ const GameRoomPage: NextPage = () => {
     const sanitized = expr.replace(/x/g, '*').replace(/÷/g, '/').replace(/[^-+*/().0-9 ]/g, '');
     try {
       if (!sanitized.trim()) return null;
-      // Basic safety check: ensure it doesn't look like anything but math
       if (/[^0-9+\-*/(). ]/.test(sanitized)) return null;
       const result = new Function(`return ${sanitized}`)();
       return typeof result === 'number' && isFinite(result) ? Math.round(result * 100) / 100 : null;
@@ -227,7 +226,7 @@ const GameRoomPage: NextPage = () => {
         score: 0,
         hasAnswered: false,
         isCorrect: null,
-        lastActive: serverTimestamp()
+        lastActive: Timestamp.now()
     }));
 
     await updateFirestoreState({
@@ -253,7 +252,6 @@ const GameRoomPage: NextPage = () => {
     let nextA: number;
     let nextIdx = gameState.currentQuestionIndex ?? 0;
 
-    // Check if we finished custom questions
     if (gameState.customQuestions && gameState.customQuestions.length > 0 && nextIdx >= gameState.customQuestions.length) {
       endGame();
       return;
@@ -273,7 +271,7 @@ const GameRoomPage: NextPage = () => {
         ...p,
         hasAnswered: false,
         isCorrect: null,
-        lastActive: serverTimestamp()
+        lastActive: Timestamp.now()
     }));
 
     await updateFirestoreState({
@@ -296,7 +294,7 @@ const GameRoomPage: NextPage = () => {
     const updatedPlayers = gameState.players.map(p => ({
         ...p,
         isCorrect: p.hasAnswered ? p.isCorrect : false,
-        lastActive: serverTimestamp()
+        lastActive: Timestamp.now()
     }));
 
     await updateFirestoreState({
@@ -395,7 +393,7 @@ const GameRoomPage: NextPage = () => {
                        score: (p.score ?? 0) + scoreToAdd,
                        hasAnswered: true,
                        isCorrect: isAnswerCorrect,
-                       lastActive: serverTimestamp()
+                       lastActive: Timestamp.now()
                       };
                  }
                  return p;
@@ -469,7 +467,6 @@ const GameRoomPage: NextPage = () => {
     );
   }
 
-  // Final Results Screen
   if (gameState.isGameOver) {
     const top3 = sortedPlayers.slice(0, 3);
     return (
@@ -482,7 +479,6 @@ const GameRoomPage: NextPage = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex justify-around items-end pt-8 pb-4">
-                {/* 2nd Place */}
                 {top3[1] && (
                     <div className="flex flex-col items-center gap-2">
                          <div className="relative">
@@ -499,7 +495,6 @@ const GameRoomPage: NextPage = () => {
                          <span className="text-sm font-mono">{top3[1].score} pts</span>
                     </div>
                 )}
-                {/* 1st Place */}
                 {top3[0] && (
                     <div className="flex flex-col items-center gap-2 -translate-y-4">
                          <div className="relative">
@@ -516,7 +511,6 @@ const GameRoomPage: NextPage = () => {
                          <span className="text-sm font-mono font-bold">{top3[0].score} pts</span>
                     </div>
                 )}
-                {/* 3rd Place */}
                 {top3[2] && (
                     <div className="flex flex-col items-center gap-2">
                          <div className="relative">
