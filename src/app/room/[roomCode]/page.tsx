@@ -12,10 +12,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, XCircle, Share2, Clock, LogOut, Loader2, Plus, Trash2, Activity, Trophy, Target, Users } from 'lucide-react';
+import { CheckCircle, XCircle, LogOut, Loader2, Plus, Trash2, Activity, Trophy, Target } from 'lucide-react';
 import { getPlayerInfo, savePlayerInfo, clearPlayerInfo, generateId } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
 import type { Player, GameState } from '@/types/game';
 import placeholders from '@/app/lib/placeholder-images.json';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -29,7 +29,6 @@ const GameRoomPage: NextPage = () => {
   const router = useRouter();
   const { toast } = useToast();
   const roomCode = params.roomCode as string;
-  const isInitiallyHost = searchParams.get('host') === 'true';
 
   const [localPlayerInfo, setLocalPlayerInfo] = useState<{ playerId: string; playerName: string } | null>(null);
   const [inputPlayerName, setInputPlayerName] = useState<string>('');
@@ -110,7 +109,7 @@ const GameRoomPage: NextPage = () => {
   useEffect(() => {
     if (!roomCode || !db) return;
     const saved = getPlayerInfo();
-    if (!localPlayerInfo && saved) { setLocalPlayerInfo(saved); setIsJoining(false); }
+    if (saved) setLocalPlayerInfo(saved);
 
     unsubscribeRef.current = onSnapshot(doc(db, 'gameRooms', roomCode), (snap) => {
       if (snap.exists()) {
@@ -134,17 +133,7 @@ const GameRoomPage: NextPage = () => {
       if (unsubscribeRef.current) unsubscribeRef.current();
       if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
     };
-  }, [roomCode, router, localPlayerInfo]);
-
-  const startGame = useCallback(async () => {
-    if (!gameState || !isHost || gameState.isGameActive) return;
-    const { question: nextQ, answer: nextA } = (gameState.customQuestions?.[0]) || generateEquation();
-    await updateFirestoreState({
-      question: nextQ, answer: nextA, isGameActive: true, isGameOver: false, isShowingResults: false,
-      currentRound: 1, currentQuestionIndex: gameState.customQuestions?.length ? 1 : 0,
-      players: gameState.players.map(p => ({ ...p, score: 0, hasAnswered: false, isCorrect: null }))
-    });
-  }, [gameState, isHost, updateFirestoreState]);
+  }, [roomCode, router]);
 
   const nextQuestion = useCallback(async () => {
     if (!gameState || !isHost) return;
@@ -168,8 +157,7 @@ const GameRoomPage: NextPage = () => {
   useEffect(() => {
     if (!isHost || !gameState?.isGameActive || gameState.isShowingResults) return;
     const allAnswered = gameState.players.every(p => p.hasAnswered);
-    const allCorrect = allAnswered && gameState.players.every(p => p.isCorrect);
-    if (allCorrect || allAnswered || roundTimeLeft <= 0) {
+    if (allAnswered || roundTimeLeft <= 0) {
       updateFirestoreState({ isShowingResults: true });
       roundEndTimeoutRef.current = setTimeout(nextQuestion, RESULTS_DISPLAY_DURATION);
     }
@@ -198,7 +186,8 @@ const GameRoomPage: NextPage = () => {
 
   const handleLeaveGame = async () => {
     if (!localPlayerInfo) return;
-    clearPlayerInfo(); router.push('/');
+    clearPlayerInfo(); 
+    router.push('/');
     try {
       await runTransaction(db!, async (tx) => {
         const snap = await tx.get(doc(db!, 'gameRooms', roomCode));
@@ -311,7 +300,7 @@ const GameRoomPage: NextPage = () => {
           <div className="w-full max-w-sm space-y-6 animate-in fade-in zoom-in">
             <Card className="p-8 text-center border-none shadow-xl bg-white dark:bg-slate-900 rounded-[2rem]">
               <div className="text-[8px] font-black uppercase text-primary/60 tracking-widest mb-2">Round {gameState.currentRound}</div>
-              <div className={`text-4xl font-mono font-black tracking-tighter ${isPlayerCorrect ? 'text-accent' : ''}`}>
+              <div className={`text-3xl font-mono font-black tracking-tighter ${isPlayerCorrect ? 'text-accent' : ''}`}>
                 {gameState.isShowingResults || isPlayerCorrect ? `${gameState.question} = ${gameState.answer}` : `${gameState.question} = ?`}
               </div>
             </Card>
@@ -334,7 +323,7 @@ const GameRoomPage: NextPage = () => {
                     <h2 className="text-xl font-black tracking-tight">Ready for Sync?</h2>
                     <p className="text-[9px] font-bold text-muted-foreground uppercase">{gameState?.players?.length} Players Connected</p>
                   </div>
-                  <Button onClick={startGame} className="w-full h-11 rounded-xl font-black text-xs text-white">START PULSE</Button>
+                  <Button onClick={() => updateFirestoreState({ isGameActive: true, isGameOver: false, currentRound: 1 })} className="w-full h-11 rounded-xl font-black text-xs text-white">START PULSE</Button>
                 </TabsContent>
                 <TabsContent value="custom" className="space-y-4">
                    <div className="flex gap-2">
@@ -349,7 +338,7 @@ const GameRoomPage: NextPage = () => {
                         </div>
                       ))}
                    </ScrollArea>
-                   <Button onClick={startGame} className="w-full h-11 rounded-xl font-black text-xs text-white">START CUSTOM PULSE</Button>
+                   <Button onClick={() => updateFirestoreState({ isGameActive: true, isGameOver: false, currentRound: 1 })} className="w-full h-11 rounded-xl font-black text-xs text-white">START CUSTOM PULSE</Button>
                 </TabsContent>
               </Tabs>
             ) : (
@@ -364,7 +353,11 @@ const GameRoomPage: NextPage = () => {
           </Card>
         )}
       </main>
-      <footer className="mt-8 text-center"><Button variant="ghost" size="sm" onClick={() => setShowScoreboard(!showScoreboard)} className="text-[7px] font-black uppercase tracking-widest text-muted-foreground/40">{showScoreboard ? 'Hide Feed' : 'Show Feed'}</Button></footer>
+      <footer className="mt-8 text-center">
+        <Button variant="ghost" size="sm" onClick={() => setShowScoreboard(!showScoreboard)} className="text-[7px] font-black uppercase tracking-widest text-muted-foreground/40">
+          {showScoreboard ? 'Hide Feed' : 'Show Feed'}
+        </Button>
+      </footer>
     </div>
   );
 };
