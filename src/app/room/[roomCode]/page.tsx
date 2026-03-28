@@ -73,8 +73,8 @@ const GameRoomPage: NextPage = () => {
 
     switch (op) {
       case '+':
-        const a1 = Math.floor(Math.random() * 9000) + 1000;
-        const a2 = Math.floor(Math.random() * 9000) + 1000;
+        const a1 = Math.floor(Math.random() * 90000) + 10000;
+        const a2 = Math.floor(Math.random() * 90000) + 10000;
         question = `${a1} + ${a2}`;
         answer = a1 + a2;
         break;
@@ -667,6 +667,7 @@ const GameRoomPage: NextPage = () => {
                                         ))}
                                         {(!gameState.customQuestions || gameState.customQuestions.length === 0) && <p className="text-center text-muted-foreground text-xs p-4">No custom questions. Random will be used.</p>}
                                     </ScrollArea>
+                                    <Button onClick={startGame} className="w-full mt-4" variant="default">Start Game</Button>
                                 </div>
                             </TabsContent>
                         </Tabs>
