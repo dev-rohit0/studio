@@ -36,7 +36,6 @@ const GameRoomPage: NextPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isJoining, setIsJoining] = useState(true);
   const [showScoreboard, setShowScoreboard] = useState(true);
-  const [isRoundEnding, setIsRoundEnding] = useState(false);
   const [roundTimeLeft, setRoundTimeLeft] = useState(ROUND_DURATION);
   
   // Custom question form state
@@ -66,7 +65,7 @@ const GameRoomPage: NextPage = () => {
 
   // Local timer management
   useEffect(() => {
-    if (gameState?.isGameActive && !gameState?.isGameOver && gameState?.currentRound > 0 && !isRoundEnding) {
+    if (gameState?.isGameActive && !gameState?.isGameOver && !gameState?.isShowingResults && gameState?.currentRound > 0) {
       setRoundTimeLeft(ROUND_DURATION);
       const intervalId = setInterval(() => {
         setRoundTimeLeft((prev) => {
@@ -78,10 +77,10 @@ const GameRoomPage: NextPage = () => {
         });
       }, 1000);
       return () => clearInterval(intervalId);
-    } else {
+    } else if (gameState?.isShowingResults) {
       setRoundTimeLeft(0);
     }
-  }, [gameState?.currentRound, gameState?.isGameActive, gameState?.isGameOver, isRoundEnding]);
+  }, [gameState?.currentRound, gameState?.isGameActive, gameState?.isGameOver, gameState?.isShowingResults]);
 
   const generateEquation = (): { question: string; answer: number } => {
     const operations = ['+', '-', '*', '/'];
@@ -190,6 +189,7 @@ const GameRoomPage: NextPage = () => {
     await updateFirestoreState({
         isGameActive: false,
         isGameOver: true,
+        isShowingResults: false,
         timeLeft: 0
     });
   }, [updateFirestoreState]);
@@ -225,6 +225,7 @@ const GameRoomPage: NextPage = () => {
         timeLeft: ROUND_DURATION,
         isGameActive: true,
         isGameOver: false,
+        isShowingResults: false,
         currentRound: 1,
         players: resetPlayers,
         roundStartTime: serverTimestamp(),
@@ -235,7 +236,6 @@ const GameRoomPage: NextPage = () => {
   const nextQuestion = useCallback(async () => {
     if (!gameState || !isHost || !gameState.isGameActive) return;
 
-    setIsRoundEnding(false);
     if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
 
     let nextQ: string;
@@ -268,18 +268,17 @@ const GameRoomPage: NextPage = () => {
         question: nextQ,
         answer: nextA,
         timeLeft: ROUND_DURATION,
+        isShowingResults: false,
         currentRound: (gameState.currentRound || 0) + 1,
         players: resetPlayers,
         roundStartTime: serverTimestamp(),
         currentQuestionIndex: nextIdx
     });
     setCurrentAnswer('');
-    setIsRoundEnding(false);
   }, [gameState, isHost, updateFirestoreState, endGame]);
 
   const endRound = useCallback(async () => {
-    if (!gameState || !isHost || isRoundEnding || !gameState.isGameActive) return;
-    setIsRoundEnding(true);
+    if (!gameState || !isHost || gameState.isShowingResults || !gameState.isGameActive) return;
 
     const updatedPlayers = gameState.players.map(p => ({
         ...p,
@@ -289,38 +288,32 @@ const GameRoomPage: NextPage = () => {
 
     await updateFirestoreState({
         players: updatedPlayers,
+        isShowingResults: true,
         timeLeft: 0,
     });
 
     roundEndTimeoutRef.current = setTimeout(() => {
         nextQuestion();
     }, RESULTS_DISPLAY_DURATION);
-  }, [gameState, isHost, isRoundEnding, updateFirestoreState, nextQuestion]);
+  }, [gameState, isHost, updateFirestoreState, nextQuestion]);
 
-  // Host listener for timer end
+  // Host listener for timer and auto-advancing
   useEffect(() => {
-    if (!isHost || !gameState?.isGameActive || isRoundEnding) return;
-    if (roundTimeLeft <= 0) {
-      endRound();
-    }
-  }, [isHost, gameState?.isGameActive, isRoundEnding, roundTimeLeft, endRound]);
-
-  // Handle auto-advancing if everyone answers
-  useEffect(() => {
-    if (!isHost || !gameState?.isGameActive || isRoundEnding || !gameState.players || gameState.players.length === 0) return;
+    if (!isHost || !gameState?.isGameActive || gameState.isShowingResults || !gameState.players || gameState.players.length === 0) return;
     
     const allAnswered = gameState.players.every(p => p.hasAnswered);
     const allCorrect = allAnswered && gameState.players.every(p => p.isCorrect === true);
 
     if (allCorrect) {
+        // Everyone is right, advance quickly without showing results screen for 3s
         if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
-        const advanceTimeout = setTimeout(() => nextQuestion(), 800);
-        return () => clearTimeout(advanceTimeout);
-    } else if (allAnswered) {
-        if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
+        const autoAdvance = setTimeout(() => nextQuestion(), 1000);
+        return () => clearTimeout(autoAdvance);
+    } else if (allAnswered || roundTimeLeft <= 0) {
+        // Everyone answered (but someone is wrong) or time is up
         endRound();
     }
-  }, [gameState?.players, isHost, gameState?.isGameActive, isRoundEnding, nextQuestion, endRound]);
+  }, [gameState?.players, isHost, gameState?.isGameActive, gameState?.isShowingResults, roundTimeLeft, nextQuestion, endRound]);
 
   const handleJoinGame = async () => {
       const name = inputPlayerName.trim();
@@ -353,12 +346,12 @@ const GameRoomPage: NextPage = () => {
 
   const handleAnswerSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!localPlayerInfo || !gameState?.isGameActive || currentAnswer === '' || isRoundEnding || roundTimeLeft <= 0 || !db) return;
+      if (!localPlayerInfo || !gameState?.isGameActive || gameState.isShowingResults || currentAnswer === '' || roundTimeLeft <= 0 || !db) return;
 
       const playerInState = gameState.players.find(p => p.id === localPlayerInfo.playerId);
       if (!playerInState || (playerInState.hasAnswered && playerInState.isCorrect)) return;
 
-      const submittedAnswer = parseInt(currentAnswer, 10);
+      const submittedAnswer = parseFloat(currentAnswer);
       const isAnswerCorrect = submittedAnswer === gameState.answer;
       let scoreToAdd = 0;
 
@@ -433,6 +426,7 @@ const GameRoomPage: NextPage = () => {
     await updateFirestoreState({
         isGameOver: false,
         isGameActive: false,
+        isShowingResults: false,
         currentRound: 0,
         players: gameState?.players.map(p => ({ ...p, score: 0, hasAnswered: false, isCorrect: null })) || []
     });
@@ -554,14 +548,14 @@ const GameRoomPage: NextPage = () => {
                 <span>Round: {gameState.currentRound > 0 ? gameState.currentRound : '-'}</span>
                 <div className="flex items-center gap-1">
                     <Clock className="h-4 w-4" />
-                    <span>{gameState.isGameActive && !isRoundEnding ? `${roundTimeLeft}s` : '--'}</span>
+                    <span>{gameState.isGameActive && !gameState.isShowingResults ? `${roundTimeLeft}s` : '--'}</span>
                 </div>
                 <div className="flex items-center gap-1">
                    <Users className="h-4 w-4" />
                    <span>{gameState.players?.length ?? 0}</span>
                 </div>
              </div>
-             {gameState.isGameActive && !isRoundEnding && roundTimeLeft > 0 && (
+             {gameState.isGameActive && !gameState.isShowingResults && roundTimeLeft > 0 && (
                 <Progress value={(roundTimeLeft / ROUND_DURATION) * 100} className="w-full h-2 mt-2" />
              )}
          </CardHeader>
@@ -605,13 +599,13 @@ const GameRoomPage: NextPage = () => {
                     <Card className="w-full bg-card shadow-lg text-center p-6">
                         <CardDescription className="mb-2">Question {gameState.currentRound}</CardDescription>
                         <CardTitle className="text-3xl font-mono">
-                           {(isRoundEnding || isPlayerCorrect) ? `${gameState.question} = ${gameState.answer}` : `${gameState.question} = ?`}
+                           {(gameState.isShowingResults || isPlayerCorrect) ? `${gameState.question} = ${gameState.answer}` : `${gameState.question} = ?`}
                         </CardTitle>
                     </Card>
 
                     <form onSubmit={handleAnswerSubmit} className="w-full space-y-2">
-                        <Input ref={answerInputRef} type="number" placeholder="Your Answer" value={currentAnswer} onChange={(e) => setCurrentAnswer(e.target.value)} className="text-center text-2xl h-14" disabled={isPlayerCorrect || isRoundEnding} />
-                        <Button type="submit" className="w-full text-lg py-3" disabled={isPlayerCorrect || currentAnswer === '' || isRoundEnding}>
+                        <Input ref={answerInputRef} type="number" placeholder="Your Answer" value={currentAnswer} onChange={(e) => setCurrentAnswer(e.target.value)} className="text-center text-2xl h-14" disabled={isPlayerCorrect || gameState.isShowingResults} />
+                        <Button type="submit" className="w-full text-lg py-3" disabled={isPlayerCorrect || currentAnswer === '' || gameState.isShowingResults}>
                             {isPlayerCorrect ? 'Correct!' : 'Submit Answer'}
                          </Button>
                     </form>

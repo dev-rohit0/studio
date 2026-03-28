@@ -24,6 +24,7 @@ export interface GameState {
   timeLeft: number;
   isGameActive: boolean;
   isGameOver?: boolean;
+  isShowingResults?: boolean;
   currentRound: number;
   roundStartTime: Timestamp | number | null;
   createdAt?: Timestamp;
