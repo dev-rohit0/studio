@@ -37,6 +37,7 @@ const GameRoomPage: NextPage = () => {
   const [isJoining, setIsJoining] = useState(true);
   const [showScoreboard, setShowScoreboard] = useState(true);
   const [isRoundEnding, setIsRoundEnding] = useState(false);
+  const [roundTimeLeft, setRoundTimeLeft] = useState(ROUND_DURATION);
   
   // Custom question form state
   const [newQ, setNewQ] = useState('');
@@ -62,6 +63,25 @@ const GameRoomPage: NextPage = () => {
     const ans = evaluateExpression(newQ);
     setAutoCalcAns(ans);
   }, [newQ]);
+
+  // Local timer management
+  useEffect(() => {
+    if (gameState?.isGameActive && !gameState?.isGameOver && gameState?.currentRound > 0 && !isRoundEnding) {
+      setRoundTimeLeft(ROUND_DURATION);
+      const intervalId = setInterval(() => {
+        setRoundTimeLeft((prev) => {
+          if (prev <= 0) {
+            clearInterval(intervalId);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(intervalId);
+    } else {
+      setRoundTimeLeft(0);
+    }
+  }, [gameState?.currentRound, gameState?.isGameActive, gameState?.isGameOver, isRoundEnding]);
 
   const generateEquation = (): { question: string; answer: number } => {
     const operations = ['+', '-', '*', '/'];
@@ -113,35 +133,6 @@ const GameRoomPage: NextPage = () => {
   const isHost = currentPlayer?.isHost ?? false;
   const isPlayerCorrect = currentPlayer?.isCorrect === true;
   const sortedPlayers = gameState?.players ? [...gameState.players].sort((a, b) => b.score - a.score) : [];
-
-  const calculateRoundTimeLeft = useCallback(() => {
-    if (!gameState?.isGameActive || isRoundEnding || !gameState.roundStartTime) {
-        return gameState?.timeLeft ?? 0;
-    }
-    const startTimeMillis = gameState.roundStartTime instanceof Timestamp
-        ? gameState.roundStartTime.toMillis()
-        : typeof gameState.roundStartTime === 'number'
-        ? gameState.roundStartTime
-        : Date.now();
-
-    const elapsed = Math.floor((Date.now() - startTimeMillis) / 1000);
-    return Math.max(0, ROUND_DURATION - elapsed);
-  }, [gameState?.isGameActive, gameState?.roundStartTime, gameState?.timeLeft, isRoundEnding]);
-
-  const [roundTimeLeft, setRoundTimeLeft] = useState(() => calculateRoundTimeLeft());
-
-  useEffect(() => {
-    setRoundTimeLeft(calculateRoundTimeLeft());
-  }, [calculateRoundTimeLeft]);
-
-  useEffect(() => {
-    if (gameState?.isGameActive && !isRoundEnding && gameState.roundStartTime) {
-      const intervalId = setInterval(() => {
-        setRoundTimeLeft(calculateRoundTimeLeft());
-      }, 500);
-      return () => clearInterval(intervalId);
-    }
-  }, [gameState?.isGameActive, isRoundEnding, gameState?.roundStartTime, calculateRoundTimeLeft]);
 
   useEffect(() => {
     if (!roomCode || !db) return;
@@ -242,7 +233,7 @@ const GameRoomPage: NextPage = () => {
   }, [gameState, isHost, updateFirestoreState]);
 
   const nextQuestion = useCallback(async () => {
-    if (!gameState || !isHost || !gameState.isGameActive || isRoundEnding) return;
+    if (!gameState || !isHost || !gameState.isGameActive) return;
 
     setIsRoundEnding(false);
     if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
@@ -284,7 +275,7 @@ const GameRoomPage: NextPage = () => {
     });
     setCurrentAnswer('');
     setIsRoundEnding(false);
-  }, [gameState, isHost, isRoundEnding, updateFirestoreState, endGame]);
+  }, [gameState, isHost, updateFirestoreState, endGame]);
 
   const endRound = useCallback(async () => {
     if (!gameState || !isHost || isRoundEnding || !gameState.isGameActive) return;
@@ -306,18 +297,18 @@ const GameRoomPage: NextPage = () => {
     }, RESULTS_DISPLAY_DURATION);
   }, [gameState, isHost, isRoundEnding, updateFirestoreState, nextQuestion]);
 
+  // Host listener for timer end
   useEffect(() => {
-    if (!isHost || !gameState?.isGameActive || isRoundEnding || !gameState.roundStartTime) return;
-    const interval = setInterval(() => {
-        if (calculateRoundTimeLeft() <= 0) {
-            endRound();
-        }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isHost, gameState, isRoundEnding, endRound, calculateRoundTimeLeft]);
+    if (!isHost || !gameState?.isGameActive || isRoundEnding) return;
+    if (roundTimeLeft <= 0) {
+      endRound();
+    }
+  }, [isHost, gameState?.isGameActive, isRoundEnding, roundTimeLeft, endRound]);
 
+  // Handle auto-advancing if everyone answers
   useEffect(() => {
-    if (!isHost || !gameState?.isGameActive || isRoundEnding || !gameState.players) return;
+    if (!isHost || !gameState?.isGameActive || isRoundEnding || !gameState.players || gameState.players.length === 0) return;
+    
     const allAnswered = gameState.players.every(p => p.hasAnswered);
     const allCorrect = allAnswered && gameState.players.every(p => p.isCorrect === true);
 
@@ -372,9 +363,7 @@ const GameRoomPage: NextPage = () => {
       let scoreToAdd = 0;
 
       if (isAnswerCorrect) {
-            const startTimeMillis = gameState.roundStartTime instanceof Timestamp ? gameState.roundStartTime.toMillis() : Date.now();
-            const timeElapsed = Math.floor((Date.now() - startTimeMillis) / 1000);
-            scoreToAdd = Math.max(5, (ROUND_DURATION - timeElapsed) * 2 + 10);
+            scoreToAdd = Math.max(5, roundTimeLeft * 2 + 10);
       }
 
       toast({
