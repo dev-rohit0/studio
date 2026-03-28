@@ -1,9 +1,6 @@
-// src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAnalytics, isSupported } from "firebase/analytics";
-import type { FirebaseApp } from 'firebase/app';
-import type { Firestore } from 'firebase/firestore';
+import { getAnalytics, isSupported } from 'firebase/analytics';
 import type { Analytics } from 'firebase/analytics';
 
 const firebaseConfig = {
@@ -16,35 +13,17 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID,
 };
 
-let app: FirebaseApp | undefined;
-let db: Firestore | undefined;
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 let analytics: Analytics | undefined;
 
-if (typeof window !== 'undefined') {
-  if (!getApps().length) {
-    try {
-      app = initializeApp(firebaseConfig);
-    } catch (error) {
-      console.error('[Firebase] Error initializing Firebase app:', error);
+if (typeof window !== 'undefined' && firebaseConfig.measurementId) {
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
     }
-  } else {
-    app = getApp();
-  }
-
-  if (app) {
-    db = getFirestore(app);
-    if (firebaseConfig.measurementId) {
-      isSupported().then((supported) => {
-        if (supported && app) {
-          try {
-            analytics = getAnalytics(app);
-          } catch (error) {
-            console.error('[Firebase] Error initializing Analytics:', error);
-          }
-        }
-      });
-    }
-  }
+  });
 }
 
-export { db, app, analytics };
+export { app, db, analytics };
