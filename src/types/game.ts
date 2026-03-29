@@ -1,5 +1,4 @@
-// src/types/game.ts
-import type { Timestamp } from 'firebase/firestore';
+import type { Timestamp, FieldValue } from 'firebase/firestore';
 
 export interface CustomQuestion {
   question: string;
@@ -26,8 +25,12 @@ export interface GameState {
   isGameOver?: boolean;
   isShowingResults?: boolean;
   currentRound: number;
-  roundStartTime: Timestamp | number | null;
-  createdAt?: Timestamp;
+
+  roundStartTime: Timestamp | FieldValue | null;
+
+  // ✅ FIX HERE
+  createdAt?: Timestamp | FieldValue;
+
   customQuestions?: CustomQuestion[];
   currentQuestionIndex?: number;
 }
