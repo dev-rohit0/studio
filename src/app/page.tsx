@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { NextPage } from 'next';
@@ -152,7 +151,7 @@ const HomePage: NextPage = () => {
         <CardContent className="space-y-6 pt-10 pb-10 px-6 sm:px-10">
           <Button
             onClick={handleCreateRoom}
-            className="w-full text-lg py-8 rounded-3xl shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] group bg-primary hover:bg-primary/90 text-white font-black"
+            className="w-full text-sm py-7 rounded-3xl shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] group bg-primary hover:bg-primary/90 text-white font-black"
             disabled={isCreatingRoom || isJoiningRoom}
           >
             {isCreatingRoom ? <Loader2 className="mr-3 animate-spin" /> : <Zap className="mr-3 fill-white group-hover:animate-bounce" />}
@@ -184,7 +183,7 @@ const HomePage: NextPage = () => {
             <Button
               onClick={handleJoinRoom}
               variant="outline"
-              className="w-full text-base py-7 rounded-3xl border-2 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/40 transition-all font-black dark:border-slate-800"
+              className="w-full text-xs py-6 rounded-3xl border-2 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/40 transition-all font-black dark:border-slate-800"
               disabled={roomCodeInput.length !== 6 || isJoiningRoom || isCreatingRoom}
             >
                {isJoiningRoom ? <Loader2 className="mr-3 animate-spin" /> : <Users className="mr-3" />}
