@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle, Users, Share2, Clock, LogOut, Loader2, Plus, Trash2, Activity, Trophy, Medal, Award, Target, Zap } from 'lucide-react';
 import { getPlayerInfo, savePlayerInfo, clearPlayerInfo, generateId } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Timestamp, runTransaction, Firestore } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
 import type { Player, GameState } from '@/types/game';
 import AdBanner from '@/components/ads/AdBanner';
 import placeholders from '@/app/lib/placeholder-images.json';
@@ -301,16 +301,10 @@ const GameRoomPage: NextPage = () => {
     if (!isHost || !gameState?.isGameActive || gameState.isShowingResults || !gameState.players || gameState.players.length === 0) return;
     
     const allAnswered = gameState.players.every(p => p.hasAnswered);
-    const allCorrect = allAnswered && gameState.players.every(p => p.isCorrect === true);
-
-    if (allCorrect) {
-        if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
-        // Instant advance when everyone in the global lobby is correct
-        nextQuestion();
-    } else if (allAnswered || roundTimeLeft <= 0) {
+    if (allAnswered || roundTimeLeft <= 0) {
         endRound();
     }
-  }, [gameState?.players, isHost, gameState?.isGameActive, gameState?.isShowingResults, roundTimeLeft, nextQuestion, endRound]);
+  }, [gameState?.players, isHost, gameState?.isGameActive, gameState?.isShowingResults, roundTimeLeft, endRound]);
 
   const handleJoinGame = async () => {
       const name = inputPlayerName.trim();
@@ -641,7 +635,18 @@ const GameRoomPage: NextPage = () => {
         <div className="flex-grow flex flex-col justify-center items-center px-4 py-4 sm:px-8">
             {gameState.isGameActive ? (
                 <div className="w-full space-y-4 animate-in fade-in zoom-in duration-500 max-w-lg mx-auto">
-                    <Card className="w-full bg-white dark:bg-slate-900 shadow-xl text-center py-6 px-4 rounded-[1.5rem] border-none ring-1 ring-slate-100 dark:ring-slate-800">
+                    <Card className="w-full bg-white dark:bg-slate-900 shadow-xl text-center py-6 px-4 rounded-[1.5rem] border-none ring-1 ring-slate-100 dark:ring-slate-800 relative">
+                        {isHost && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={endGame}
+                            className="absolute top-2 right-2 h-6 w-6 text-destructive hover:bg-destructive/10"
+                            title="End Challenge"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
                         <div className="inline-block px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 mb-3">
                            <span className="text-[7px] font-black text-primary uppercase tracking-widest">Target Locked Round {gameState.currentRound}</span>
                         </div>
