@@ -544,9 +544,9 @@ const GameRoomPage: NextPage = () => {
           </CardContent>
           <CardFooter className="flex flex-col gap-3 pt-8 pb-12 px-8 sm:px-14">
              {isHost && (
-                <Button onClick={handleResetLobby} className="w-full h-14 rounded-2xl text-sm font-black shadow-xl hover:scale-[1.02] active:scale-95 transition-all bg-primary text-white">LOBBY ACCESS</Button>
+                <Button onClick={handleResetLobby} className="w-full h-14 rounded-2xl text-[10px] font-black shadow-xl hover:scale-[1.02] active:scale-95 transition-all bg-primary text-white">LOBBY ACCESS</Button>
              )}
-             <Button variant="outline" onClick={handleLeaveGame} className="w-full h-14 rounded-2xl text-xs font-bold border-2 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900">DISCONNECT</Button>
+             <Button variant="outline" onClick={handleLeaveGame} className="w-full h-14 rounded-2xl text-[10px] font-bold border-2 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900">DISCONNECT</Button>
           </CardFooter>
         </Card>
         <AdBanner className="mt-8 mx-auto border-none opacity-40 max-w-lg" />
@@ -567,7 +567,7 @@ const GameRoomPage: NextPage = () => {
                     <div className="bg-primary p-1.5 rounded-lg shadow-lg group-hover:animate-pulse">
                         <Activity className="h-4 w-4 text-white" />
                     </div>
-                    <CardTitle className="text-lg font-black tracking-tighter text-slate-800 dark:text-white">MathPulse</CardTitle>
+                    <CardTitle className="text-base font-black tracking-tighter text-slate-800 dark:text-white">MathPulse</CardTitle>
                  </div>
                  <div className="flex items-center gap-1.5 bg-slate-100/80 dark:bg-slate-800/80 p-1 rounded-xl mr-12">
                     <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(roomCode); toast({ title: 'Code Copied' }); }} className="font-mono font-black h-7 px-2 text-primary dark:text-primary-foreground text-[10px] tracking-widest hover:bg-white dark:hover:bg-slate-700 rounded-lg transition-colors">
@@ -585,20 +585,20 @@ const GameRoomPage: NextPage = () => {
              <div className="grid grid-cols-3 gap-2.5">
                 <div className="bg-slate-50/50 dark:bg-slate-950/50 p-2 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center">
                     <span className="text-[8px] uppercase font-black text-muted-foreground/60 tracking-widest mb-0.5">Round</span>
-                    <span className="font-mono font-black text-primary text-sm">{gameState.currentRound > 0 ? gameState.currentRound : '--'}</span>
+                    <span className="font-mono font-black text-primary text-xs">{gameState.currentRound > 0 ? gameState.currentRound : '--'}</span>
                 </div>
                 <div className={`p-2 rounded-xl border flex flex-col items-center transition-all duration-500 ${roundTimeLeft < 5 && gameState.isGameActive ? 'bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900 text-red-600 dark:text-red-400 scale-105 shadow-lg' : 'bg-slate-50/50 dark:bg-slate-950/50 border-slate-100 dark:border-slate-800 text-slate-800 dark:text-white'}`}>
                     <span className="text-[8px] uppercase font-black text-muted-foreground/60 tracking-widest mb-0.5">Clock</span>
                     <div className="flex items-center gap-1">
                         <Clock className={`h-3 w-3 ${roundTimeLeft < 5 && gameState.isGameActive ? 'animate-pulse' : ''}`} />
-                        <span className="font-mono font-black text-sm">{gameState.isGameActive && !gameState.isShowingResults ? `${roundTimeLeft}s` : '--'}</span>
+                        <span className="font-mono font-black text-xs">{gameState.isGameActive && !gameState.isShowingResults ? `${roundTimeLeft}s` : '--'}</span>
                     </div>
                 </div>
                 <div className="bg-slate-50/50 dark:bg-slate-950/50 p-2 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center">
                     <span className="text-[8px] uppercase font-black text-muted-foreground/60 tracking-widest mb-0.5">Players</span>
                     <div className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
-                        <span className="font-mono font-black text-sm">{gameState.players?.length ?? 0}</span>
+                        <span className="font-mono font-black text-xs">{gameState.players?.length ?? 0}</span>
                     </div>
                 </div>
              </div>
@@ -639,7 +639,7 @@ const GameRoomPage: NextPage = () => {
                                 {gameState.isGameActive && player.hasAnswered && (
                                      player.isCorrect === true ? <CheckCircle className="h-3 w-3 text-accent fill-accent/10" /> : <XCircle className="h-3 w-3 text-destructive fill-destructive/10" />
                                 )}
-                                <span className="font-mono font-black w-8 text-right text-xs tracking-tighter">{player.score}</span>
+                                <span className="font-mono font-black w-8 text-right text-[10px] tracking-tighter">{player.score}</span>
                           </div>
                        </div>
                     ))}
@@ -656,7 +656,7 @@ const GameRoomPage: NextPage = () => {
                         <div className="inline-block px-2.5 py-0.5 rounded-full bg-primary/5 dark:bg-primary/10 border border-primary/10 dark:border-primary/20 mb-4">
                            <span className="text-[8px] font-black text-primary dark:text-primary uppercase tracking-[0.1em]">PULSE CHALLENGE {gameState.currentRound}</span>
                         </div>
-                        <CardTitle className={`text-2xl sm:text-3xl md:text-4xl font-black font-mono tracking-tighter leading-tight transition-all duration-300 ${isPlayerCorrect ? 'text-accent scale-105' : 'text-slate-900 dark:text-white'}`}>
+                        <CardTitle className={`text-xl sm:text-2xl md:text-3xl font-black font-mono tracking-tighter leading-tight transition-all duration-300 ${isPlayerCorrect ? 'text-accent scale-105' : 'text-slate-900 dark:text-white'}`}>
                            {(gameState.isShowingResults || isPlayerCorrect) ? `${gameState.question} = ${gameState.answer}` : `${gameState.question} = ?`}
                         </CardTitle>
                     </Card>
@@ -669,10 +669,10 @@ const GameRoomPage: NextPage = () => {
                           value={currentAnswer} 
                           onChange={(e) => setCurrentAnswer(e.target.value)} 
                           onKeyDown={(e) => e.key === 'Enter' && handleAnswerSubmit(e as any)}
-                          className="text-center text-2xl h-16 rounded-[1.5rem] border-2 dark:border-slate-800 font-black shadow-inner bg-white/50 dark:bg-slate-950/50 focus-visible:ring-primary/40 focus-visible:border-primary/40 transition-all" 
+                          className="text-center text-xl h-14 rounded-[1.5rem] border-2 dark:border-slate-800 font-black shadow-inner bg-white/50 dark:bg-slate-950/50 focus-visible:ring-primary/40 focus-visible:border-primary/40 transition-all" 
                           disabled={isPlayerCorrect || gameState.isShowingResults} 
                         />
-                        <Button onClick={handleAnswerSubmit} className="w-full h-14 rounded-[1.5rem] text-sm font-black shadow-2xl transition-all hover:scale-[1.02] active:scale-95 bg-primary text-white" disabled={isPlayerCorrect || currentAnswer === '' || gameState.isShowingResults}>
+                        <Button onClick={handleAnswerSubmit} className="w-full h-14 rounded-[1.5rem] text-[10px] font-black shadow-2xl transition-all hover:scale-[1.02] active:scale-95 bg-primary text-white" disabled={isPlayerCorrect || currentAnswer === '' || gameState.isShowingResults}>
                             {isPlayerCorrect ? (
                                <div className="flex items-center gap-2">
                                   <CheckCircle className="h-4 w-4" />
@@ -697,20 +697,20 @@ const GameRoomPage: NextPage = () => {
                             </TabsList>
                             <TabsContent value="lobby" className="space-y-4 text-center py-4">
                                 <div className="space-y-1">
-                                   <CardTitle className="text-2xl font-black tracking-tighter">Prepare for Sync</CardTitle>
+                                   <CardTitle className="text-xl font-black tracking-tighter">Prepare for Sync</CardTitle>
                                    <CardDescription className="font-black text-[8px] uppercase tracking-[0.2em] text-muted-foreground/60">{gameState.customQuestions?.length ? `${gameState.customQuestions.length} Custom Modules Loaded` : 'Standard Global Difficulty'}</CardDescription>
                                 </div>
                                 <div className="bg-primary/5 dark:bg-primary/10 rounded-[1.5rem] p-5 border border-primary/10 dark:border-primary/20 shadow-inner">
                                     <Target className="h-8 w-8 text-primary dark:text-primary mx-auto mb-3 drop-shadow-md" />
                                     <p className="text-[10px] text-slate-600 dark:text-slate-400 font-bold italic">Competition initiates upon launch.</p>
                                 </div>
-                                <Button onClick={startGame} className="w-full h-14 text-sm rounded-[1.5rem] shadow-2xl font-black hover:scale-105 active:scale-95 transition-all bg-primary text-white">START PULSE</Button>
+                                <Button onClick={startGame} className="w-full h-14 text-[10px] rounded-[1.5rem] shadow-2xl font-black hover:scale-105 active:scale-95 transition-all bg-primary text-white">START PULSE</Button>
                             </TabsContent>
                             <TabsContent value="custom" className="space-y-4 pt-1">
                                 <div className="space-y-3">
                                     <div className="flex flex-col sm:flex-row gap-2.5">
                                         <div className="flex-grow flex flex-col gap-1">
-                                            <Input placeholder="Expression (e.g. 52 x 12)" value={newQ} onChange={e => setNewQ(e.target.value)} className="rounded-xl h-10 text-sm font-bold bg-slate-50 dark:bg-slate-950 border-2 dark:border-slate-800" />
+                                            <Input placeholder="Expression (e.g. 52 x 12)" value={newQ} onChange={e => setNewQ(e.target.value)} className="rounded-xl h-10 text-[10px] font-bold bg-slate-50 dark:bg-slate-950 border-2 dark:border-slate-800" />
                                             {autoCalcAns !== null && (
                                                 <div className="flex items-center gap-1.5 ml-2">
                                                    <div className="h-1 w-1 rounded-full bg-accent animate-pulse" />
@@ -725,7 +725,7 @@ const GameRoomPage: NextPage = () => {
                                        <ScrollArea className="h-[120px] border-2 border-slate-50 dark:border-slate-800 rounded-[1.5rem] p-2 bg-slate-50/30 dark:bg-slate-950/30">
                                            {(gameState.customQuestions || []).map((q, i) => (
                                                <div key={i} className="flex justify-between items-center p-2.5 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl mb-1.5 shadow-sm animate-in fade-in duration-300">
-                                                   <span className="font-mono font-black text-slate-800 dark:text-slate-200 text-xs">{q.question} = {q.answer}</span>
+                                                   <span className="font-mono font-black text-slate-800 dark:text-slate-200 text-[10px]">{q.question} = {q.answer}</span>
                                                    <Button variant="ghost" size="sm" onClick={() => handleRemoveCustomQuestion(i)} className="h-7 w-7 p-0 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-500 rounded-lg transition-colors"><Trash2 className="h-3.5 w-3.5" /></Button>
                                                </div>
                                            ))}
@@ -737,7 +737,7 @@ const GameRoomPage: NextPage = () => {
                                            )}
                                        </ScrollArea>
                                     </div>
-                                    <Button onClick={startGame} className="w-full h-14 rounded-[1.5rem] shadow-2xl font-black text-sm hover:scale-105 active:scale-95 transition-all text-white">DEPLOY PULSE</Button>
+                                    <Button onClick={startGame} className="w-full h-14 rounded-[1.5rem] shadow-2xl font-black text-[10px] hover:scale-105 active:scale-95 transition-all text-white">DEPLOY PULSE</Button>
                                 </div>
                             </TabsContent>
                         </Tabs>
@@ -748,7 +748,7 @@ const GameRoomPage: NextPage = () => {
                                <div className="absolute inset-0 bg-primary/20 blur-[40px] rounded-full -z-10" />
                             </div>
                             <div className="space-y-2">
-                                <CardTitle className="text-2xl font-black tracking-tighter">Waiting for Host</CardTitle>
+                                <CardTitle className="text-xl font-black tracking-tighter">Waiting for Host</CardTitle>
                                 <CardDescription className="font-black text-[8px] uppercase tracking-[0.3em] text-primary/60">Establishing Global Sync...</CardDescription>
                             </div>
                             <div className="bg-slate-50/50 dark:bg-slate-950/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800 backdrop-blur-sm">

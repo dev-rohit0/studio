@@ -151,7 +151,7 @@ const HomePage: NextPage = () => {
         <CardContent className="space-y-6 pt-10 pb-10 px-6 sm:px-10">
           <Button
             onClick={handleCreateRoom}
-            className="w-full text-sm py-7 rounded-3xl shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] group bg-primary hover:bg-primary/90 text-white font-black"
+            className="w-full text-xs py-6 rounded-3xl shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] group bg-primary hover:bg-primary/90 text-white font-black"
             disabled={isCreatingRoom || isJoiningRoom}
           >
             {isCreatingRoom ? <Loader2 className="mr-3 animate-spin" /> : <Zap className="mr-3 fill-white group-hover:animate-bounce" />}
@@ -175,7 +175,7 @@ const HomePage: NextPage = () => {
               placeholder="000000"
               value={roomCodeInput}
               onChange={(e) => setRoomCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="text-center text-3xl sm:text-4xl font-mono tracking-[0.3em] h-16 sm:h-20 rounded-3xl border-2 dark:border-slate-800 focus-visible:ring-primary/40 bg-slate-50/50 dark:bg-slate-950/50 font-black"
+              className="text-center text-2xl sm:text-3xl font-mono tracking-[0.3em] h-14 sm:h-16 rounded-3xl border-2 dark:border-slate-800 focus-visible:ring-primary/40 bg-slate-50/50 dark:bg-slate-950/50 font-black"
               maxLength={6}
               inputMode="numeric"
               disabled={isCreatingRoom || isJoiningRoom}
@@ -183,7 +183,7 @@ const HomePage: NextPage = () => {
             <Button
               onClick={handleJoinRoom}
               variant="outline"
-              className="w-full text-xs py-6 rounded-3xl border-2 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/40 transition-all font-black dark:border-slate-800"
+              className="w-full text-[10px] py-5 rounded-3xl border-2 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/40 transition-all font-black dark:border-slate-800"
               disabled={roomCodeInput.length !== 6 || isJoiningRoom || isCreatingRoom}
             >
                {isJoiningRoom ? <Loader2 className="mr-3 animate-spin" /> : <Users className="mr-3" />}
