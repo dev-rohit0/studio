@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle, Users, Share2, Clock, LogOut, Loader2, Plus, Trash2, Activity, Trophy, Medal, Award, Target, Zap } from 'lucide-react';
 import { getPlayerInfo, savePlayerInfo, clearPlayerInfo, generateId } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Timestamp, runTransaction, Firestore } from 'firebase/firestore';
 import type { Player, GameState } from '@/types/game';
 import AdBanner from '@/components/ads/AdBanner';
 import placeholders from '@/app/lib/placeholder-images.json';
@@ -352,7 +352,7 @@ const GameRoomPage: NextPage = () => {
       const isAnswerCorrect = submittedAnswer === gameState.answer;
       const scoreToAdd = isAnswerCorrect ? Math.max(5, roundTimeLeft * 2 + 10) : 0;
 
-       const roomDocRef = doc(db!, 'gameRooms', roomCode);
+       const roomDocRef = doc(db as Firestore, 'gameRooms', roomCode);
        try {
               const updatedPlayers = gameState.players.map(p => {
                  if (p.id === localPlayerInfo.playerId) {
