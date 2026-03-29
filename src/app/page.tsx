@@ -125,12 +125,12 @@ const HomePage: NextPage = () => {
 
       <div className="mb-6 w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-700">
         {!logoError ? (
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] shadow-2xl ring-1 ring-slate-100 dark:ring-slate-800 transition-transform hover:scale-105">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-[1.5rem] shadow-2xl ring-1 ring-slate-100 dark:ring-slate-800 transition-transform hover:scale-105">
             <Image 
               src={placeholders.logo.url} 
               alt={placeholders.logo.alt} 
-              width={180} 
-              height={60} 
+              width={160} 
+              height={50} 
               priority
               style={{ height: 'auto' }}
               className="object-contain dark:invert dark:brightness-200"
@@ -138,12 +138,12 @@ const HomePage: NextPage = () => {
             />
           </div>
         ) : (
-          <div className="bg-primary/20 p-8 rounded-[2rem] border-2 border-primary/20 backdrop-blur-sm">
-            <Activity className="h-14 w-14 text-primary animate-pulse" />
+          <div className="bg-primary/20 p-6 rounded-[1.5rem] border-2 border-primary/20 backdrop-blur-sm">
+            <Activity className="h-10 w-10 text-primary animate-pulse" />
           </div>
         )}
         <div className="mt-4 px-4 py-1.5 bg-white dark:bg-slate-900 rounded-full border border-primary/10 dark:border-primary/20 shadow-md">
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-primary/80 dark:text-primary">Precision • Speed • MathPulse</p>
+          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/80 dark:text-primary">Precision • Speed • MathPulse</p>
         </div>
       </div>
 
@@ -151,7 +151,7 @@ const HomePage: NextPage = () => {
         <CardContent className="space-y-6 pt-10 pb-10 px-6 sm:px-10">
           <Button
             onClick={handleCreateRoom}
-            className="w-full text-[10px] py-6 rounded-2xl shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] group bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest"
+            className="w-full text-[9px] py-6 rounded-2xl shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] group bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest"
             disabled={isCreatingRoom || isJoiningRoom}
           >
             {isCreatingRoom ? <Loader2 className="mr-3 animate-spin" /> : <Zap className="mr-3 fill-white group-hover:animate-bounce h-4 w-4" />}
@@ -162,7 +162,7 @@ const HomePage: NextPage = () => {
              <div className="absolute inset-0 flex items-center">
                <span className="w-full border-t border-slate-200 dark:border-slate-800" />
              </div>
-             <div className="relative flex justify-center text-[8px] uppercase tracking-[0.2em] font-black">
+             <div className="relative flex justify-center text-[7px] uppercase tracking-[0.2em] font-black">
                <span className="bg-white/90 dark:bg-slate-900 px-4 text-muted-foreground/60">
                  Join Active Pulse
                </span>
@@ -191,7 +191,7 @@ const HomePage: NextPage = () => {
             </Button>
           </div>
         </CardContent>
-         <CardFooter className="text-[8px] text-muted-foreground/40 text-center justify-center uppercase font-black tracking-[0.4em] pb-8">
+         <CardFooter className="text-[7px] text-muted-foreground/40 text-center justify-center uppercase font-black tracking-[0.4em] pb-8">
             Fastest Finger First Challenge
          </CardFooter>
       </Card>

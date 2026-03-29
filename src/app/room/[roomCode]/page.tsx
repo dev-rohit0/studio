@@ -442,7 +442,7 @@ const GameRoomPage: NextPage = () => {
               ) : <Activity className="h-10 w-10 text-primary animate-pulse" />}
             </div>
             <CardTitle className="text-center text-lg font-black tracking-tighter uppercase">Sync Your Pulse</CardTitle>
-            <CardDescription className="text-center font-bold text-[8px] uppercase tracking-widest text-muted-foreground pt-1">Room Code: {roomCode}</CardDescription>
+            <CardDescription className="text-center font-bold text-[7px] uppercase tracking-widest text-muted-foreground pt-1">Room Code: {roomCode}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pb-12 px-8 sm:px-10">
             <Input 
@@ -451,11 +451,11 @@ const GameRoomPage: NextPage = () => {
               onChange={(e) => setInputPlayerName(e.target.value)} 
               maxLength={15} 
               onKeyDown={(e) => e.key === 'Enter' && handleJoinGame()} 
-              className="h-12 rounded-xl text-sm font-bold border-2 dark:border-slate-800 focus-visible:ring-primary/40 bg-slate-50/50 dark:bg-slate-950/50 text-center uppercase" 
+              className="h-12 rounded-xl text-xs font-bold border-2 dark:border-slate-800 focus-visible:ring-primary/40 bg-slate-50/50 dark:bg-slate-950/50 text-center uppercase" 
             />
             <Button 
               onClick={handleJoinGame} 
-              className="w-full h-12 text-[9px] rounded-xl shadow-xl font-black transition-transform active:scale-95 text-white uppercase tracking-widest" 
+              className="w-full h-12 text-[8px] rounded-xl shadow-xl font-black transition-transform active:scale-95 text-white uppercase tracking-widest" 
               disabled={!inputPlayerName.trim() || (gameState?.players.length ?? 0) >= 12}
             >
               JOIN ROUND
@@ -475,70 +475,67 @@ const GameRoomPage: NextPage = () => {
         </div>
         <Card className="w-full shadow-2xl rounded-[2.5rem] overflow-hidden border-none bg-gradient-to-br from-primary/5 via-white to-white dark:from-primary/10 dark:via-slate-900 dark:to-slate-900 animate-in fade-in zoom-in duration-700">
           <CardHeader className="text-center pt-10 pb-6">
-            <Trophy className="h-12 w-12 text-yellow-500 mx-auto mb-4 animate-bounce" />
-            <CardTitle className="text-2xl font-black tracking-tighter uppercase">Leaderboard</CardTitle>
-            <CardDescription className="font-black uppercase tracking-[0.3em] text-[8px] text-muted-foreground pt-2">Pulse Champions</CardDescription>
+            <Trophy className="h-10 w-10 text-yellow-500 mx-auto mb-4 animate-bounce" />
+            <CardTitle className="text-xl font-black tracking-tighter uppercase">Leaderboard</CardTitle>
+            <CardDescription className="font-black uppercase tracking-[0.3em] text-[7px] text-muted-foreground pt-2">Pulse Champions</CardDescription>
           </CardHeader>
           <CardContent className="px-4 sm:px-10">
             <div className="flex justify-center items-end gap-2 sm:gap-6 pt-10 pb-10">
                 {top3[1] && (
                     <div className="flex flex-col items-center gap-2 animate-in slide-in-from-left duration-1000">
                          <div className="relative">
-                            <Avatar className="h-10 w-10 sm:h-12 sm:w-12 border-2 border-slate-200 dark:border-slate-700">
+                            <Avatar className="h-10 w-10 border-2 border-slate-200 dark:border-slate-700">
                                 <AvatarImage src={`https://picsum.photos/seed/${top3[1].id}/128/128`} />
-                                <AvatarFallback className="text-[9px] font-black">{top3[1].name[0]}</AvatarFallback>
+                                <AvatarFallback className="text-[8px] font-black">{top3[1].name[0]}</AvatarFallback>
                             </Avatar>
                             <div className="absolute -bottom-1 -right-1 bg-slate-400 text-white rounded-full p-0.5 shadow-md border border-white dark:border-slate-900">
-                                <Medal className="h-2.5 w-2.5" />
+                                <Medal className="h-2 w-2" />
                             </div>
                          </div>
-                         <span className="font-black text-[8px] text-slate-700 dark:text-slate-300 uppercase truncate max-w-[60px]">{top3[1].name}</span>
-                         <div className="bg-slate-200 dark:bg-slate-800 h-10 sm:h-14 w-12 sm:w-16 rounded-t-xl flex items-center justify-center text-xs font-black text-slate-600">2nd</div>
-                         <span className="text-[8px] font-black font-mono bg-slate-100 dark:bg-slate-800 px-2 rounded-full">{top3[1].score}</span>
+                         <span className="font-black text-[7px] text-slate-700 dark:text-slate-300 uppercase truncate max-w-[50px]">{top3[1].name}</span>
+                         <div className="bg-slate-200 dark:bg-slate-800 h-10 w-12 rounded-t-xl flex items-center justify-center text-[10px] font-black text-slate-600">2nd</div>
+                         <span className="text-[7px] font-black font-mono bg-slate-100 dark:bg-slate-800 px-2 rounded-full">{top3[1].score}</span>
                     </div>
                 )}
                 {top3[0] && (
-                    <div className="flex flex-col items-center gap-2 -translate-y-8 animate-in slide-in-from-bottom duration-700">
+                    <div className="flex flex-col items-center gap-2 -translate-y-6 animate-in slide-in-from-bottom duration-700">
                          <div className="relative">
-                            <div className="absolute -top-6 left-1/2 -translate-x-1/2">
-                               <CrownIcon className="h-5 w-5 text-yellow-400" />
-                            </div>
-                            <Avatar className="h-14 w-14 sm:h-20 sm:w-20 border-2 border-yellow-400 shadow-lg shadow-yellow-200/20">
+                            <Avatar className="h-14 w-14 border-2 border-yellow-400 shadow-lg shadow-yellow-200/20">
                                 <AvatarImage src={`https://picsum.photos/seed/${top3[0].id}/128/128`} />
-                                <AvatarFallback className="text-sm font-black text-yellow-500">{top3[0].name[0]}</AvatarFallback>
+                                <AvatarFallback className="text-[10px] font-black text-yellow-500">{top3[0].name[0]}</AvatarFallback>
                             </Avatar>
-                            <div className="absolute -bottom-1 -right-1 bg-yellow-500 text-white rounded-full p-1 shadow-md border border-white dark:border-slate-900">
-                                <Trophy className="h-3 w-3" />
+                            <div className="absolute -bottom-1 -right-1 bg-yellow-500 text-white rounded-full p-0.5 shadow-md border border-white dark:border-slate-900">
+                                <Trophy className="h-2.5 w-2.5" />
                             </div>
                          </div>
-                         <span className="font-black text-[9px] text-yellow-700 dark:text-yellow-400 uppercase truncate max-w-[80px]">{top3[0].name}</span>
-                         <div className="bg-yellow-400 dark:bg-yellow-600 h-18 sm:h-24 w-16 sm:w-24 rounded-t-xl flex items-center justify-center text-lg font-black text-yellow-900">1st</div>
-                         <span className="text-[9px] font-black font-mono bg-yellow-100 dark:bg-yellow-900/40 px-3 py-0.5 rounded-full">{top3[0].score}</span>
+                         <span className="font-black text-[8px] text-yellow-700 dark:text-yellow-400 uppercase truncate max-w-[60px]">{top3[0].name}</span>
+                         <div className="bg-yellow-400 dark:bg-yellow-600 h-16 w-16 rounded-t-xl flex items-center justify-center text-sm font-black text-yellow-900">1st</div>
+                         <span className="text-[8px] font-black font-mono bg-yellow-100 dark:bg-yellow-900/40 px-3 py-0.5 rounded-full">{top3[0].score}</span>
                     </div>
                 )}
                 {top3[2] && (
                     <div className="flex flex-col items-center gap-2 animate-in slide-in-from-right duration-1000">
                          <div className="relative">
-                            <Avatar className="h-10 w-10 sm:h-12 sm:w-12 border-2 border-amber-600">
+                            <Avatar className="h-10 w-10 border-2 border-amber-600">
                                 <AvatarImage src={`https://picsum.photos/seed/${top3[2].id}/128/128`} />
-                                <AvatarFallback className="text-[9px] font-black">{top3[2].name[0]}</AvatarFallback>
+                                <AvatarFallback className="text-[8px] font-black">{top3[2].name[0]}</AvatarFallback>
                             </Avatar>
                             <div className="absolute -bottom-1 -right-1 bg-amber-600 text-white rounded-full p-0.5 shadow-md border border-white dark:border-slate-900">
-                                <Award className="h-2.5 w-2.5" />
+                                <Award className="h-2 w-2" />
                             </div>
                          </div>
-                         <span className="font-black text-[8px] text-amber-700 dark:text-amber-500 uppercase truncate max-w-[60px]">{top3[2].name}</span>
-                         <div className="bg-amber-500 dark:bg-amber-700 h-8 sm:h-10 w-12 sm:w-16 rounded-t-xl flex items-center justify-center text-xs font-black text-white">3rd</div>
-                         <span className="text-[8px] font-black font-mono bg-amber-100 dark:bg-amber-900/40 px-2 rounded-full">{top3[2].score}</span>
+                         <span className="font-black text-[7px] text-amber-700 dark:text-amber-500 uppercase truncate max-w-[50px]">{top3[2].name}</span>
+                         <div className="bg-amber-500 dark:bg-amber-700 h-8 w-12 rounded-t-xl flex items-center justify-center text-[10px] font-black text-white">3rd</div>
+                         <span className="text-[7px] font-black font-mono bg-amber-100 dark:bg-amber-900/40 px-2 rounded-full">{top3[2].score}</span>
                     </div>
                 )}
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-3 pt-6 pb-10 px-8 sm:px-14">
              {isHost && (
-                <Button onClick={handleResetLobby} className="w-full h-12 rounded-xl text-[9px] font-black shadow-xl uppercase tracking-widest text-white">LOBBY ACCESS</Button>
+                <Button onClick={handleResetLobby} className="w-full h-11 rounded-xl text-[8px] font-black shadow-xl uppercase tracking-widest text-white">LOBBY ACCESS</Button>
              )}
-             <Button variant="outline" onClick={handleLeaveGame} className="w-full h-12 rounded-xl text-[8px] font-bold uppercase border-2 dark:border-slate-800">DISCONNECT</Button>
+             <Button variant="outline" onClick={handleLeaveGame} className="w-full h-11 rounded-xl text-[7px] font-bold uppercase border-2 dark:border-slate-800">DISCONNECT</Button>
           </CardFooter>
         </Card>
       </div>
@@ -556,10 +553,10 @@ const GameRoomPage: NextPage = () => {
              <div className="flex justify-between items-center mb-4">
                  <div className="flex items-center gap-2 group cursor-pointer" onClick={() => router.push('/')}>
                     <Activity className="h-4 w-4 text-primary" />
-                    <CardTitle className="text-sm font-black tracking-tighter uppercase text-slate-800 dark:text-white">MathPulse</CardTitle>
+                    <CardTitle className="text-xs font-black tracking-tighter uppercase text-slate-800 dark:text-white">MathPulse</CardTitle>
                  </div>
                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg mr-12">
-                    <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(roomCode); toast({ title: 'Code Copied' }); }} className="font-mono font-black h-6 px-1.5 text-primary text-[8px] tracking-widest rounded transition-colors uppercase">
+                    <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(roomCode); toast({ title: 'Code Copied' }); }} className="font-mono font-black h-6 px-1.5 text-primary text-[7px] tracking-widest rounded transition-colors uppercase">
                        {roomCode}
                     </Button>
                     <div className="w-[1px] h-3 bg-slate-300 dark:bg-slate-600 mx-0.5" />
@@ -573,21 +570,21 @@ const GameRoomPage: NextPage = () => {
              </div>
              <div className="grid grid-cols-3 gap-2">
                 <div className="bg-slate-50/50 dark:bg-slate-950/50 p-1.5 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center">
-                    <span className="text-[7px] uppercase font-black text-muted-foreground/60 tracking-widest">Round</span>
-                    <span className="font-mono font-black text-primary text-[10px]">{gameState.currentRound > 0 ? gameState.currentRound : '--'}</span>
+                    <span className="text-[6px] uppercase font-black text-muted-foreground/60 tracking-widest">Round</span>
+                    <span className="font-mono font-black text-primary text-[9px]">{gameState.currentRound > 0 ? gameState.currentRound : '--'}</span>
                 </div>
                 <div className={`p-1.5 rounded-xl border flex flex-col items-center transition-all ${roundTimeLeft < 5 && gameState.isGameActive ? 'bg-red-50 dark:bg-red-950/20 border-red-200 text-red-600' : 'bg-slate-50/50 dark:bg-slate-950/50 border-slate-100 dark:border-slate-800'}`}>
-                    <span className="text-[7px] uppercase font-black text-muted-foreground/60 tracking-widest">Clock</span>
+                    <span className="text-[6px] uppercase font-black text-muted-foreground/60 tracking-widest">Clock</span>
                     <div className="flex items-center gap-1">
-                        <Clock className="h-2.5 w-2.5" />
-                        <span className="font-mono font-black text-[10px]">{gameState.isGameActive && !gameState.isShowingResults ? `${roundTimeLeft}s` : '--'}</span>
+                        <Clock className="h-2 w-2" />
+                        <span className="font-mono font-black text-[9px]">{gameState.isGameActive && !gameState.isShowingResults ? `${roundTimeLeft}s` : '--'}</span>
                     </div>
                 </div>
                 <div className="bg-slate-50/50 dark:bg-slate-950/50 p-1.5 rounded-xl border border-slate-100 dark:border-slate-800 flex flex-col items-center">
-                    <span className="text-[7px] uppercase font-black text-muted-foreground/60 tracking-widest">Users</span>
+                    <span className="text-[6px] uppercase font-black text-muted-foreground/60 tracking-widest">Users</span>
                     <div className="flex items-center gap-1">
-                        <Users className="h-2.5 w-2.5" />
-                        <span className="font-mono font-black text-[10px]">{gameState.players?.length ?? 0}</span>
+                        <Users className="h-2 w-2" />
+                        <span className="font-mono font-black text-[9px]">{gameState.players?.length ?? 0}</span>
                     </div>
                 </div>
              </div>
@@ -600,29 +597,29 @@ const GameRoomPage: NextPage = () => {
         </Card>
 
         <div className="flex-shrink-0 mx-4">
-           <Button onClick={() => setShowScoreboard(!showScoreboard)} variant="ghost" size="sm" className="w-full mb-1 h-5 text-[7px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 hover:text-primary">
+           <Button onClick={() => setShowScoreboard(!showScoreboard)} variant="ghost" size="sm" className="w-full mb-1 h-5 text-[6px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 hover:text-primary">
                {showScoreboard ? 'Hide Standings' : 'Show Standings'}
            </Button>
            {showScoreboard && (
               <Card className="shadow-lg rounded-[1rem] border-none bg-white/70 dark:bg-slate-900/70 backdrop-blur-md overflow-hidden animate-in slide-in-from-top-2">
                  <CardContent className="p-0">
-                    <ScrollArea className={`px-4 py-2 ${gameState.isGameActive ? 'h-[80px]' : 'h-[120px]'}`}>
+                    <ScrollArea className={`px-4 py-2 ${gameState.isGameActive ? 'h-[70px]' : 'h-[100px]'}`}>
                     {sortedPlayers.map((player, index) => (
-                       <div key={player.id} className={`flex items-center justify-between p-1.5 rounded-lg transition-all mb-1 ${player.id === localPlayerInfo?.playerId ? 'bg-primary/5 border border-primary/20' : 'hover:bg-white/50 dark:hover:bg-slate-800/50'}`}>
+                       <div key={player.id} className={`flex items-center justify-between p-1 rounded-lg transition-all mb-1 ${player.id === localPlayerInfo?.playerId ? 'bg-primary/5 border border-primary/20' : 'hover:bg-white/50 dark:hover:bg-slate-800/50'}`}>
                           <div className="flex items-center gap-2">
-                              <span className={`w-3 text-center font-mono font-black text-[8px] ${index < 3 ? 'text-primary' : 'text-muted-foreground/40'}`}>{index + 1}</span>
-                              <Avatar className="h-6 w-6 border border-white dark:border-slate-800">
+                              <span className={`w-3 text-center font-mono font-black text-[7px] ${index < 3 ? 'text-primary' : 'text-muted-foreground/40'}`}>{index + 1}</span>
+                              <Avatar className="h-5 w-5 border border-white dark:border-slate-800">
                                   <AvatarImage src={`https://picsum.photos/seed/${player.id}/64/64`} />
-                                  <AvatarFallback className="text-[7px] font-black">{player.name[0]}</AvatarFallback>
+                                  <AvatarFallback className="text-[6px] font-black">{player.name[0]}</AvatarFallback>
                               </Avatar>
-                              <span className={`truncate max-w-[80px] text-[9px] font-black uppercase ${player.id === localPlayerInfo?.playerId ? 'text-primary' : ''}`}>{player.name}</span>
-                              {player.isHost && <CrownIcon className="h-2 w-2 text-yellow-400" />}
+                              <span className={`truncate max-w-[70px] text-[8px] font-black uppercase ${player.id === localPlayerInfo?.playerId ? 'text-primary' : ''}`}>{player.name}</span>
+                              {player.isHost && <Zap className="h-2 w-2 text-yellow-500 fill-yellow-500" />}
                           </div>
                           <div className="flex items-center gap-1.5">
                                 {gameState.isGameActive && player.hasAnswered && (
-                                     player.isCorrect === true ? <CheckCircle className="h-2.5 w-2.5 text-accent" /> : <XCircle className="h-2.5 w-2.5 text-destructive" />
+                                     player.isCorrect === true ? <CheckCircle className="h-2 w-2 text-accent" /> : <XCircle className="h-2 w-2 text-destructive" />
                                 )}
-                                <span className="font-mono font-black text-[9px] w-6 text-right">{player.score}</span>
+                                <span className="font-mono font-black text-[8px] w-5 text-right">{player.score}</span>
                           </div>
                        </div>
                     ))}
@@ -636,19 +633,8 @@ const GameRoomPage: NextPage = () => {
             {gameState.isGameActive ? (
                 <div className="w-full space-y-4 animate-in fade-in zoom-in duration-500 max-w-lg mx-auto">
                     <Card className="w-full bg-white dark:bg-slate-900 shadow-xl text-center py-6 px-4 rounded-[1.5rem] border-none ring-1 ring-slate-100 dark:ring-slate-800 relative">
-                        {isHost && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={endGame}
-                            className="absolute top-2 right-2 h-6 w-6 text-destructive hover:bg-destructive/10"
-                            title="End Challenge"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        )}
                         <div className="inline-block px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 mb-3">
-                           <span className="text-[7px] font-black text-primary uppercase tracking-widest">Target Locked Round {gameState.currentRound}</span>
+                           <span className="text-[6px] font-black text-primary uppercase tracking-widest">Target Locked Round {gameState.currentRound}</span>
                         </div>
                         <CardTitle className={`text-2xl sm:text-3xl font-black font-mono tracking-tighter leading-tight ${isPlayerCorrect ? 'text-accent' : ''}`}>
                            {(gameState.isShowingResults || isPlayerCorrect) ? `${gameState.question} = ${gameState.answer}` : `${gameState.question} = ?`}
@@ -662,13 +648,26 @@ const GameRoomPage: NextPage = () => {
                               placeholder="ANSWER..." 
                               value={currentAnswer} 
                               onChange={(e) => setCurrentAnswer(e.target.value)} 
-                              className="text-center text-xl h-12 rounded-xl border-2 dark:border-slate-800 font-black shadow-inner bg-white/50 dark:bg-slate-950/50 focus-visible:ring-primary/40 uppercase" 
+                              className="text-center text-lg h-12 rounded-xl border-2 dark:border-slate-800 font-black shadow-inner bg-white/50 dark:bg-slate-950/50 focus-visible:ring-primary/40 uppercase" 
                               disabled={isPlayerCorrect || gameState.isShowingResults} 
                             />
-                            <Button type="submit" className="w-full h-12 rounded-xl text-[9px] font-black shadow-lg transition-transform active:scale-95 text-white uppercase tracking-widest" disabled={isPlayerCorrect || currentAnswer === '' || gameState.isShowingResults}>
+                            <Button type="submit" className="w-full h-12 rounded-xl text-[8px] font-black shadow-lg transition-transform active:scale-95 text-white uppercase tracking-widest" disabled={isPlayerCorrect || currentAnswer === '' || gameState.isShowingResults}>
                                 {isPlayerCorrect ? 'SYNC LOCKED' : 'SUBMIT PULSE'}
                              </Button>
                         </form>
+                        
+                        {isHost && (
+                          <div className="pt-2 animate-in slide-in-from-bottom-2">
+                             <Button 
+                               onClick={endGame}
+                               variant="outline"
+                               className="w-full h-10 rounded-xl text-[7px] font-black border-2 border-destructive/20 text-destructive hover:bg-destructive/10 uppercase tracking-widest"
+                             >
+                               <Trash2 className="mr-2 h-3 w-3" />
+                               End Challenge Session
+                             </Button>
+                          </div>
+                        )}
                     </div>
                 </div>
             ) : (
@@ -676,39 +675,39 @@ const GameRoomPage: NextPage = () => {
                     {isHost ? (
                         <Tabs defaultValue="lobby" className="w-full">
                             <TabsList className="grid w-full grid-cols-2 rounded-xl h-10 bg-slate-100 dark:bg-slate-800 p-0.5 mb-4">
-                                <TabsTrigger value="lobby" className="rounded-lg font-black uppercase text-[7px] tracking-widest">Lobby</TabsTrigger>
-                                <TabsTrigger value="custom" className="rounded-lg font-black uppercase text-[7px] tracking-widest">Builder</TabsTrigger>
+                                <TabsTrigger value="lobby" className="rounded-lg font-black uppercase text-[6px] tracking-widest">Lobby</TabsTrigger>
+                                <TabsTrigger value="custom" className="rounded-lg font-black uppercase text-[6px] tracking-widest">Builder</TabsTrigger>
                             </TabsList>
                             <TabsContent value="lobby" className="space-y-4 text-center py-2">
                                 <CardTitle className="text-lg font-black tracking-tighter uppercase">Ready for Sync</CardTitle>
                                 <div className="bg-primary/5 rounded-xl p-4 border border-primary/10">
-                                    <Target className="h-6 w-6 text-primary mx-auto mb-2" />
-                                    <p className="text-[8px] text-muted-foreground font-black uppercase tracking-widest">Establishing Connection...</p>
+                                    <Target className="h-5 w-5 text-primary mx-auto mb-2" />
+                                    <p className="text-[7px] text-muted-foreground font-black uppercase tracking-widest">Establishing Connection...</p>
                                 </div>
-                                <Button onClick={startGame} className="w-full h-12 text-[9px] rounded-xl shadow-lg font-black text-white uppercase tracking-widest">START PULSE</Button>
+                                <Button onClick={startGame} className="w-full h-12 text-[8px] rounded-xl shadow-lg font-black text-white uppercase tracking-widest">START PULSE</Button>
                             </TabsContent>
                             <TabsContent value="custom" className="space-y-3">
                                 <div className="flex gap-2">
-                                    <Input placeholder="E.g. 15 x 12" value={newQ} onChange={e => setNewQ(e.target.value)} className="rounded-lg h-10 text-[9px] font-bold bg-slate-50 dark:bg-slate-950 border-2 dark:border-slate-800 uppercase" />
+                                    <Input placeholder="E.g. 15 x 12" value={newQ} onChange={e => setNewQ(e.target.value)} className="rounded-lg h-10 text-[8px] font-bold bg-slate-50 dark:bg-slate-950 border-2 dark:border-slate-800 uppercase" />
                                     <Button size="icon" onClick={handleAddCustomQuestion} disabled={autoCalcAns === null} className="rounded-lg h-10 w-10 shadow-lg text-white"><Plus className="h-4 w-4" /></Button>
                                 </div>
-                                <ScrollArea className="h-[100px] border-2 border-slate-50 dark:border-slate-800 rounded-xl p-2 bg-slate-50/30 dark:bg-slate-950/30">
+                                <ScrollArea className="h-[90px] border-2 border-slate-50 dark:border-slate-800 rounded-xl p-2 bg-slate-50/30 dark:bg-slate-950/30">
                                     {(gameState.customQuestions || []).map((q, i) => (
                                         <div key={i} className="flex justify-between items-center p-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg mb-1.5 shadow-sm">
-                                            <span className="font-mono font-black text-[9px]">{q.question} = {q.answer}</span>
+                                            <span className="font-mono font-black text-[8px]">{q.question} = {q.answer}</span>
                                             <Button variant="ghost" size="sm" onClick={() => handleRemoveCustomQuestion(i)} className="h-6 w-6 p-0 hover:text-red-500"><Trash2 className="h-3 w-3" /></Button>
                                         </div>
                                     ))}
                                 </ScrollArea>
-                                <Button onClick={startGame} className="w-full h-12 rounded-xl shadow-lg font-black text-[9px] text-white uppercase tracking-widest">DEPLOY POOL</Button>
+                                <Button onClick={startGame} className="w-full h-12 rounded-xl shadow-lg font-black text-[8px] text-white uppercase tracking-widest">DEPLOY POOL</Button>
                             </TabsContent>
                         </Tabs>
                     ) : (
                         <div className="text-center space-y-4 py-8 px-4">
-                            <Activity className="h-10 w-10 animate-pulse text-primary mx-auto" />
+                            <Activity className="h-8 w-8 animate-pulse text-primary mx-auto" />
                             <div className="space-y-1">
                                 <CardTitle className="text-lg font-black tracking-tighter uppercase">Waiting for Sync</CardTitle>
-                                <CardDescription className="font-black text-[7px] uppercase tracking-widest text-primary/60">Establishing Global Link...</CardDescription>
+                                <CardDescription className="font-black text-[6px] uppercase tracking-widest text-primary/60">Establishing Global Link...</CardDescription>
                             </div>
                         </div>
                     )}
@@ -719,11 +718,5 @@ const GameRoomPage: NextPage = () => {
     </div>
   );
 };
-
-const CrownIcon = ({ className }: { className?: string }) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M19 16v3a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-3" />
-  </svg>
-);
 
 export default GameRoomPage;
