@@ -35,6 +35,15 @@ const HomePage: NextPage = () => {
   };
 
   const handleCreateRoom = async () => {
+    if (!db) {
+      toast({
+        title: 'Connection Error',
+        description: 'Database is currently offline.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsCreatingRoom(true);
     const newRoomCode = generateRoomCode();
 
@@ -50,17 +59,7 @@ const HomePage: NextPage = () => {
     };
 
     try {
-      if (!db) {
-        toast({
-          title: 'Connection Error',
-          description: 'Database is currently offline.',
-          variant: 'destructive',
-        });
-        setIsCreatingRoom(false);
-        return;
-      }
-
-      const roomDocRef = doc(db, 'gameRooms', newRoomCode);
+      const roomDocRef = doc(db!, 'gameRooms', newRoomCode);
       await setDoc(roomDocRef, initialGameState);
       router.push(`/room/${newRoomCode}?host=true`);
     } catch (error: any) {
@@ -74,6 +73,15 @@ const HomePage: NextPage = () => {
   };
 
   const handleJoinRoom = async () => {
+    if (!db) {
+      toast({
+        title: 'Connection Error',
+        description: 'Database is currently offline.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const codeToJoin = roomCodeInput.trim();
     if (!/^\d{6}$/.test(codeToJoin)) {
       toast({
@@ -87,17 +95,7 @@ const HomePage: NextPage = () => {
     setIsJoiningRoom(true);
 
     try {
-        if (!db) {
-          toast({
-            title: 'Connection Error',
-            description: 'Database is currently offline.',
-            variant: 'destructive',
-          });
-          setIsJoiningRoom(false);
-          return;
-        }
-
-        const roomDocRef = doc(db, 'gameRooms', codeToJoin);
+        const roomDocRef = doc(db!, 'gameRooms', codeToJoin);
         const docSnap = await getDoc(roomDocRef);
 
         if (docSnap.exists()) {
@@ -126,31 +124,35 @@ const HomePage: NextPage = () => {
         <ThemeToggle />
       </div>
 
-      <div className="mb-8 w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="mb-6 w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-700">
         {!logoError ? (
-          <Image 
-            src={placeholders.logo.url} 
-            alt={placeholders.logo.alt} 
-            width={240} 
-            height={80} 
-            className="object-contain drop-shadow-2xl transition-transform hover:scale-105 dark:invert dark:brightness-200"
-            onError={() => setLogoError(true)}
-          />
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] shadow-2xl ring-1 ring-slate-100 dark:ring-slate-800 transition-transform hover:scale-105">
+            <Image 
+              src={placeholders.logo.url} 
+              alt={placeholders.logo.alt} 
+              width={220} 
+              height={70} 
+              priority
+              style={{ height: 'auto' }}
+              className="object-contain dark:invert dark:brightness-200"
+              onError={() => setLogoError(true)}
+            />
+          </div>
         ) : (
           <div className="bg-primary/20 p-8 rounded-[2rem] border-2 border-primary/20 backdrop-blur-sm">
-            <Activity className="h-16 w-16 text-primary animate-pulse" />
+            <Activity className="h-14 w-14 text-primary animate-pulse" />
           </div>
         )}
-        <div className="mt-6 px-6 py-2 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-full border border-primary/10 dark:border-primary/20 shadow-sm">
-          <p className="text-[10px] sm:text-xs font-black uppercase tracking-[0.3em] text-primary/80 dark:text-primary">Fastest Finger First Challenge</p>
+        <div className="mt-4 px-5 py-1.5 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm rounded-full border border-primary/10 dark:border-primary/20 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/80 dark:text-primary">Fastest Finger First Challenge</p>
         </div>
       </div>
 
       <Card className="w-full shadow-2xl rounded-[2.5rem] border-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl overflow-hidden animate-in zoom-in-95 duration-500">
-        <CardContent className="space-y-8 pt-10 pb-10 px-6 sm:px-10">
+        <CardContent className="space-y-6 pt-10 pb-10 px-6 sm:px-10">
           <Button
             onClick={handleCreateRoom}
-            className="w-full text-xl py-10 rounded-3xl shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] group bg-primary hover:bg-primary/90 text-white"
+            className="w-full text-lg py-8 rounded-3xl shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] group bg-primary hover:bg-primary/90 text-white font-black"
             disabled={isCreatingRoom || isJoiningRoom}
           >
             {isCreatingRoom ? <Loader2 className="mr-3 animate-spin" /> : <Zap className="mr-3 fill-white group-hover:animate-bounce" />}
@@ -174,7 +176,7 @@ const HomePage: NextPage = () => {
               placeholder="000000"
               value={roomCodeInput}
               onChange={(e) => setRoomCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="text-center text-4xl sm:text-5xl font-mono tracking-[0.3em] h-20 sm:h-24 rounded-3xl border-2 dark:border-slate-800 focus-visible:ring-primary/40 bg-slate-50/50 dark:bg-slate-950/50"
+              className="text-center text-3xl sm:text-4xl font-mono tracking-[0.3em] h-16 sm:h-20 rounded-3xl border-2 dark:border-slate-800 focus-visible:ring-primary/40 bg-slate-50/50 dark:bg-slate-950/50 font-black"
               maxLength={6}
               inputMode="numeric"
               disabled={isCreatingRoom || isJoiningRoom}
@@ -182,7 +184,7 @@ const HomePage: NextPage = () => {
             <Button
               onClick={handleJoinRoom}
               variant="outline"
-              className="w-full text-lg py-8 rounded-3xl border-2 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/40 transition-all font-bold dark:border-slate-800"
+              className="w-full text-base py-7 rounded-3xl border-2 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/40 transition-all font-black dark:border-slate-800"
               disabled={roomCodeInput.length !== 6 || isJoiningRoom || isCreatingRoom}
             >
                {isJoiningRoom ? <Loader2 className="mr-3 animate-spin" /> : <Users className="mr-3" />}
