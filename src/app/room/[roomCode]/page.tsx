@@ -47,7 +47,6 @@ const GameRoomPage: NextPage = () => {
 
   const roundEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
-  const answerInputRef = useRef<HTMLInputElement>(null);
 
   const evaluateExpression = (expr: string): number | null => {
     const sanitized = expr.replace(/x/g, '*').replace(/÷/g, '/').replace(/[^-+*/().0-9 ]/g, '');
@@ -663,7 +662,6 @@ const GameRoomPage: NextPage = () => {
 
                     <div className="w-full space-y-3">
                         <Input 
-                          ref={answerInputRef} 
                           type="number" 
                           placeholder="SOLVE..." 
                           value={currentAnswer} 
