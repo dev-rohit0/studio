@@ -1,4 +1,3 @@
-
 'use client';
 
 import type { NextPage } from 'next';
@@ -306,8 +305,8 @@ const GameRoomPage: NextPage = () => {
 
     if (allCorrect) {
         if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
-        const autoAdvance = setTimeout(() => nextQuestion(), 1000);
-        return () => clearTimeout(autoAdvance);
+        // Instant advance when everyone in the global lobby is correct
+        nextQuestion();
     } else if (allAnswered || roundTimeLeft <= 0) {
         endRound();
     }
