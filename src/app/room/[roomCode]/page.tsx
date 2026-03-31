@@ -22,6 +22,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 
 const ROUND_DURATION = 30;
 const RESULTS_DISPLAY_DURATION = 3000;
+const ALL_CORRECT_SKIP_DELAY = 1500;
 
 const GameRoomPage: NextPage = () => {
   const params = useParams();
@@ -300,10 +301,17 @@ const GameRoomPage: NextPage = () => {
     if (!isHost || !gameState?.isGameActive || gameState.isShowingResults || !gameState.players || gameState.players.length === 0) return;
     
     const allAnswered = gameState.players.every(p => p.hasAnswered);
-    if (allAnswered || roundTimeLeft <= 0) {
+    const allCorrect = gameState.players.every(p => p.isCorrect === true);
+
+    if (allCorrect) {
+       const timer = setTimeout(() => {
+          nextQuestion();
+       }, ALL_CORRECT_SKIP_DELAY);
+       return () => clearTimeout(timer);
+    } else if (allAnswered || roundTimeLeft <= 0) {
         endRound();
     }
-  }, [gameState?.players, isHost, gameState?.isGameActive, gameState?.isShowingResults, roundTimeLeft, endRound]);
+  }, [gameState?.players, isHost, gameState?.isGameActive, gameState?.isShowingResults, roundTimeLeft, endRound, nextQuestion]);
 
   const handleJoinGame = async () => {
       const name = inputPlayerName.trim();
@@ -418,7 +426,7 @@ const GameRoomPage: NextPage = () => {
 
   if (isJoining || !localPlayerInfo || !gameState?.players.some(p => p.id === localPlayerInfo?.playerId)) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 relative bg-slate-50 dark:bg-slate-950">
+      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 relative bg-slate-100 dark:bg-slate-950">
         <div className="absolute top-4 right-4 z-50">
           <ThemeToggle />
         </div>
@@ -468,7 +476,7 @@ const GameRoomPage: NextPage = () => {
   if (gameState.isGameOver) {
     const top3 = sortedPlayers.slice(0, 3);
     return (
-      <div className="flex flex-col min-h-dvh w-full max-w-2xl mx-auto p-4 sm:p-6 overflow-y-auto relative bg-slate-50 dark:bg-slate-950">
+      <div className="flex flex-col min-h-dvh w-full max-w-2xl mx-auto p-4 sm:p-6 overflow-y-auto relative bg-slate-100 dark:bg-slate-950">
         <div className="absolute top-4 right-4 z-50">
           <ThemeToggle />
         </div>
@@ -542,7 +550,7 @@ const GameRoomPage: NextPage = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-dvh w-full max-w-2xl mx-auto overflow-hidden relative bg-slate-50 dark:bg-slate-950">
+    <div className="flex flex-col min-h-dvh w-full max-w-2xl mx-auto overflow-hidden relative bg-slate-100 dark:bg-slate-950">
         <div className="absolute top-4 right-4 z-50">
           <ThemeToggle />
         </div>
@@ -654,19 +662,6 @@ const GameRoomPage: NextPage = () => {
                                 {isPlayerCorrect ? 'SYNC LOCKED' : 'SUBMIT PULSE'}
                              </Button>
                         </form>
-                        
-                        {isHost && (
-                          <div className="pt-2 animate-in slide-in-from-bottom-2">
-                             <Button 
-                               onClick={endGame}
-                               variant="outline"
-                               className="w-full h-10 rounded-xl text-[7px] font-black border-2 border-destructive/20 text-destructive hover:bg-destructive/10 uppercase tracking-widest"
-                             >
-                               <Trash2 className="mr-2 h-3 w-3" />
-                               End Challenge Session
-                             </Button>
-                          </div>
-                        )}
                     </div>
                 </div>
             ) : (
@@ -713,6 +708,19 @@ const GameRoomPage: NextPage = () => {
                  </Card>
             )}
         </div>
+
+        {isHost && gameState.isGameActive && (
+          <div className="px-4 pb-8 mt-auto w-full max-w-lg mx-auto">
+             <Button 
+               onClick={endGame}
+               variant="outline"
+               className="w-full h-10 rounded-xl text-[7px] font-black border-2 border-destructive/20 text-destructive hover:bg-destructive/10 uppercase tracking-widest"
+             >
+               <Trash2 className="mr-2 h-3 w-3" />
+               End Challenge Session
+             </Button>
+          </div>
+        )}
     </div>
   );
 };

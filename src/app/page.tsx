@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Users, Loader2, Activity, Zap, Calendar, ArrowRight } from 'lucide-react';
 import { clearPlayerInfo } from '@/lib/game-storage';
@@ -89,7 +89,7 @@ const HomePage: NextPage = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-dvh w-full max-w-lg mx-auto p-4 relative bg-slate-50 dark:bg-slate-950">
+    <div className="flex flex-col items-center justify-center min-h-dvh w-full max-w-lg mx-auto p-4 relative bg-slate-100 dark:bg-slate-950">
       <div className="absolute top-4 right-4 z-50">
         <ThemeToggle />
       </div>
