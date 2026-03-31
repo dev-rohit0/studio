@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Calendar, Trophy, ArrowLeft, Target, Activity } from 'lucide-react';
+import { Loader2, Calendar, Trophy, ArrowLeft, Activity } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import type { DailyChallenge, CustomQuestion } from '@/types/game';
+import type { DailyChallenge } from '@/types/game';
 import { ThemeToggle } from '@/components/theme-toggle';
 
 const DailyPulsePage: NextPage = () => {
@@ -91,7 +91,7 @@ const DailyPulsePage: NextPage = () => {
   if (isFinished) {
     const timeTaken = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
     return (
-      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4">
+      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 bg-slate-50 dark:bg-slate-950">
         <Card className="w-full max-w-md shadow-2xl border-none rounded-[2.5rem] bg-white/95 dark:bg-slate-900/95 p-8 text-center animate-in zoom-in-95 duration-500">
            <Trophy className="h-12 w-12 text-yellow-500 mx-auto mb-6" />
            <CardTitle className="text-lg font-black uppercase tracking-tighter mb-2">Pulse Completed</CardTitle>
@@ -113,7 +113,7 @@ const DailyPulsePage: NextPage = () => {
 
   if (!isStarted) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4">
+      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 bg-slate-50 dark:bg-slate-950">
         <Card className="w-full max-w-md shadow-2xl border-none rounded-[2.5rem] bg-white/95 dark:bg-slate-900/95 p-10 text-center">
            <Calendar className="h-10 w-10 text-primary mx-auto mb-6" />
            <CardTitle className="text-lg font-black uppercase tracking-tighter mb-2">Daily Pulse Challenge</CardTitle>
@@ -133,7 +133,7 @@ const DailyPulsePage: NextPage = () => {
   const currentQ = challenge.questions[currentIndex];
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4">
+    <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 bg-slate-50 dark:bg-slate-950">
       <div className="absolute top-4 left-4">
          <Button variant="ghost" size="sm" onClick={() => router.push('/')} className="h-8 w-8 p-0 rounded-full bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm"><ArrowLeft className="h-4 w-4" /></Button>
       </div>

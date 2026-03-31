@@ -26,6 +26,26 @@ const DailyAdminPage: NextPage = () => {
   const { toast } = useToast();
   const today = new Date().toISOString().split('T')[0];
 
+  // Auto-calculator logic
+  const evaluateExpression = (expr: string): number | null => {
+    const sanitized = expr.replace(/x/gi, '*').replace(/÷/g, '/').replace(/[^-+*/().0-9 ]/g, '');
+    try {
+      if (!sanitized.trim()) return null;
+      if (/[^0-9+\-*/(). ]/.test(sanitized)) return null;
+      const result = new Function(`return ${sanitized}`)();
+      return typeof result === 'number' && isFinite(result) ? Math.round(result * 100) / 100 : null;
+    } catch {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const calculatedAns = evaluateExpression(newQ);
+    if (calculatedAns !== null) {
+      setNewA(calculatedAns.toString());
+    }
+  }, [newQ]);
+
   useEffect(() => {
     const fetchExisting = async () => {
       if (!db) return;
@@ -66,7 +86,7 @@ const DailyAdminPage: NextPage = () => {
         updatedAt: serverTimestamp(),
       };
       await setDoc(doc(db!, 'dailyChallenges', today), challenge);
-      toast({ title: 'Daily Challenge Deployed' });
+      toast({ title: 'Daily Pulse Deployed' });
     } catch (e) {
       toast({ title: 'Deployment Error', variant: 'destructive' });
     } finally {
@@ -76,7 +96,7 @@ const DailyAdminPage: NextPage = () => {
 
   if (!isAuthorized) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-dvh p-4">
+      <div className="flex flex-col items-center justify-center min-h-dvh p-4 bg-slate-50 dark:bg-slate-950">
         <Card className="w-full max-w-sm shadow-2xl border-none rounded-[2rem] bg-white/95 dark:bg-slate-900/95 p-8 text-center">
            <Lock className="h-8 w-8 text-primary mx-auto mb-4" />
            <CardTitle className="text-sm font-black uppercase tracking-widest mb-6">Owner Authorization</CardTitle>
@@ -106,13 +126,24 @@ const DailyAdminPage: NextPage = () => {
       <Card className="shadow-2xl border-none rounded-[2.5rem] bg-white/95 dark:bg-slate-900/95 overflow-hidden">
          <CardHeader className="pt-8 pb-4 text-center">
             <CardTitle className="text-lg font-black uppercase tracking-tighter">Daily Challenge Builder</CardTitle>
-            <CardDescription className="text-[7px] font-bold uppercase tracking-widest text-primary">Deploying for: {today}</CardDescription>
+            <CardDescription className="text-[7px] font-bold uppercase tracking-widest text-primary">Auto-Calculating Pool: {today}</CardDescription>
          </CardHeader>
          <CardContent className="p-6 sm:p-10 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-               <Input placeholder="EQUATION (e.g. 15 x 12)" value={newQ} onChange={(e) => setNewQ(e.target.value)} className="h-12 rounded-xl border-2 text-[8px] font-bold uppercase" />
+               <Input 
+                placeholder="EQUATION (e.g. 15 x 12)" 
+                value={newQ} 
+                onChange={(e) => setNewQ(e.target.value)} 
+                className="h-12 rounded-xl border-2 text-[8px] font-bold uppercase" 
+               />
                <div className="flex gap-2">
-                  <Input type="number" placeholder="ANSWER" value={newA} onChange={(e) => setNewA(e.target.value)} className="h-12 rounded-xl border-2 text-[8px] font-bold uppercase" />
+                  <Input 
+                    type="number" 
+                    placeholder="RESULT" 
+                    value={newA} 
+                    onChange={(e) => setNewA(e.target.value)} 
+                    className="h-12 rounded-xl border-2 text-[8px] font-bold uppercase bg-slate-50 dark:bg-slate-950/50" 
+                  />
                   <Button onClick={handleAddQuestion} className="h-12 w-12 rounded-xl text-white shadow-lg"><Plus className="h-5 w-5" /></Button>
                </div>
             </div>

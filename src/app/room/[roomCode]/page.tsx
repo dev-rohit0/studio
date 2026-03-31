@@ -17,7 +17,6 @@ import { getPlayerInfo, savePlayerInfo, clearPlayerInfo, generateId } from '@/li
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, updateDoc, arrayUnion, serverTimestamp, Timestamp, runTransaction } from 'firebase/firestore';
 import type { Player, GameState } from '@/types/game';
-import AdBanner from '@/components/ads/AdBanner';
 import placeholders from '@/app/lib/placeholder-images.json';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -49,7 +48,7 @@ const GameRoomPage: NextPage = () => {
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
   const evaluateExpression = (expr: string): number | null => {
-    const sanitized = expr.replace(/x/g, '*').replace(/÷/g, '/').replace(/[^-+*/().0-9 ]/g, '');
+    const sanitized = expr.replace(/x/gi, '*').replace(/÷/g, '/').replace(/[^-+*/().0-9 ]/g, '');
     try {
       if (!sanitized.trim()) return null;
       if (/[^0-9+\-*/(). ]/.test(sanitized)) return null;
@@ -419,7 +418,7 @@ const GameRoomPage: NextPage = () => {
 
   if (isJoining || !localPlayerInfo || !gameState?.players.some(p => p.id === localPlayerInfo?.playerId)) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 relative">
+      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 relative bg-slate-50 dark:bg-slate-950">
         <div className="absolute top-4 right-4 z-50">
           <ThemeToggle />
         </div>
@@ -469,7 +468,7 @@ const GameRoomPage: NextPage = () => {
   if (gameState.isGameOver) {
     const top3 = sortedPlayers.slice(0, 3);
     return (
-      <div className="flex flex-col min-h-dvh w-full max-w-2xl mx-auto p-4 sm:p-6 overflow-y-auto relative">
+      <div className="flex flex-col min-h-dvh w-full max-w-2xl mx-auto p-4 sm:p-6 overflow-y-auto relative bg-slate-50 dark:bg-slate-950">
         <div className="absolute top-4 right-4 z-50">
           <ThemeToggle />
         </div>
@@ -543,7 +542,7 @@ const GameRoomPage: NextPage = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-dvh w-full max-w-2xl mx-auto overflow-hidden relative">
+    <div className="flex flex-col min-h-dvh w-full max-w-2xl mx-auto overflow-hidden relative bg-slate-50 dark:bg-slate-950">
         <div className="absolute top-4 right-4 z-50">
           <ThemeToggle />
         </div>
@@ -714,7 +713,6 @@ const GameRoomPage: NextPage = () => {
                  </Card>
             )}
         </div>
-        <AdBanner className="mx-4 mb-4 border-none opacity-40 bg-transparent flex-shrink-0" style={{minHeight: '60px'}} />
     </div>
   );
 };

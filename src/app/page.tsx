@@ -6,14 +6,13 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Users, Loader2, Activity, Zap, Calendar, ArrowRight } from 'lucide-react';
 import { clearPlayerInfo } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import type { GameState } from '@/types/game';
-import AdBanner from '@/components/ads/AdBanner';
 import placeholders from '@/app/lib/placeholder-images.json';
 import { ThemeToggle } from '@/components/theme-toggle';
 
@@ -47,6 +46,8 @@ const HomePage: NextPage = () => {
         currentRound: 0,
         roundStartTime: null,
         createdAt: serverTimestamp(),
+        customQuestions: [],
+        currentQuestionIndex: 0
     };
 
     try {
@@ -88,7 +89,7 @@ const HomePage: NextPage = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-dvh w-full max-w-lg mx-auto p-4 relative">
+    <div className="flex flex-col items-center justify-center min-h-dvh w-full max-w-lg mx-auto p-4 relative bg-slate-50 dark:bg-slate-950">
       <div className="absolute top-4 right-4 z-50">
         <ThemeToggle />
       </div>
@@ -178,7 +179,6 @@ const HomePage: NextPage = () => {
       <div className="w-full flex justify-center opacity-30 hover:opacity-100 transition-opacity">
         <Button variant="ghost" size="sm" className="text-[6px] font-black uppercase tracking-[0.3em]" onClick={() => router.push('/admin/daily')}>Owner Portal</Button>
       </div>
-      <AdBanner className="mt-6 w-full border-none bg-transparent opacity-40" />
     </div>
   );
 };
