@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Users, Loader2, Activity, Zap } from 'lucide-react';
+import { Users, Loader2, Activity, Zap, Calendar, ArrowRight } from 'lucide-react';
 import { clearPlayerInfo } from '@/lib/game-storage';
 import { db } from '@/lib/firebase';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
@@ -34,15 +34,7 @@ const HomePage: NextPage = () => {
   };
 
   const handleCreateRoom = async () => {
-    if (!db) {
-      toast({
-        title: 'Connection Error',
-        description: 'Database is currently offline.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+    if (!db) return;
     setIsCreatingRoom(true);
     const newRoomCode = generateRoomCode();
 
@@ -64,7 +56,7 @@ const HomePage: NextPage = () => {
     } catch (error: any) {
       toast({
         title: 'Error Creating Room',
-        description: 'Could not create the game room. Please try again.',
+        description: 'Could not create the game room.',
         variant: 'destructive',
       });
       setIsCreatingRoom(false);
@@ -72,47 +64,25 @@ const HomePage: NextPage = () => {
   };
 
   const handleJoinRoom = async () => {
-    if (!db) {
-      toast({
-        title: 'Connection Error',
-        description: 'Database is currently offline.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
+    if (!db) return;
     const codeToJoin = roomCodeInput.trim();
     if (!/^\d{6}$/.test(codeToJoin)) {
-      toast({
-        title: 'Invalid Room Code',
-        description: 'Please enter a valid 6-digit code.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid Room Code', variant: 'destructive' });
       return;
     }
 
     setIsJoiningRoom(true);
-
     try {
         const roomDocRef = doc(db!, 'gameRooms', codeToJoin);
         const docSnap = await getDoc(roomDocRef);
-
         if (docSnap.exists()) {
             router.push(`/room/${codeToJoin}`);
         } else {
-            toast({
-                title: 'Room Not Found',
-                description: `Room ${codeToJoin} does not exist.`,
-                variant: 'destructive',
-            });
+            toast({ title: 'Room Not Found', variant: 'destructive' });
             setIsJoiningRoom(false);
         }
     } catch (error: any) {
-        toast({
-            title: 'Error Joining Room',
-            description: 'Could not connect to the room.',
-            variant: 'destructive',
-        });
+        toast({ title: 'Connection Error', variant: 'destructive' });
         setIsJoiningRoom(false);
     }
   };
@@ -125,12 +95,12 @@ const HomePage: NextPage = () => {
 
       <div className="mb-6 w-full flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-700">
         {!logoError ? (
-          <div className="bg-white dark:bg-slate-900 p-4 rounded-[1.5rem] shadow-2xl ring-1 ring-slate-100 dark:ring-slate-800 transition-transform hover:scale-105">
+          <div className="bg-white dark:bg-slate-900 p-4 rounded-[1.5rem] shadow-2xl ring-1 ring-slate-100 dark:ring-slate-800">
             <Image 
               src={placeholders.logo.url} 
               alt={placeholders.logo.alt} 
-              width={160} 
-              height={50} 
+              width={140} 
+              height={40} 
               priority
               style={{ height: 'auto' }}
               className="object-contain dark:invert dark:brightness-200"
@@ -138,65 +108,77 @@ const HomePage: NextPage = () => {
             />
           </div>
         ) : (
-          <div className="bg-primary/20 p-6 rounded-[1.5rem] border-2 border-primary/20 backdrop-blur-sm">
+          <div className="bg-primary/20 p-6 rounded-[1.5rem] border-2 border-primary/20">
             <Activity className="h-10 w-10 text-primary animate-pulse" />
           </div>
         )}
-        <div className="mt-4 px-4 py-1.5 bg-white dark:bg-slate-900 rounded-full border border-primary/10 dark:border-primary/20 shadow-md">
-          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-primary/80 dark:text-primary">Precision • Speed • MathPulse</p>
+        <div className="mt-4 px-4 py-1.5 bg-white dark:bg-slate-900 rounded-full border border-primary/10 shadow-md">
+          <p className="text-[7px] font-black uppercase tracking-[0.2em] text-primary/80">Precision • Speed • MathPulse</p>
         </div>
       </div>
 
-      <Card className="w-full shadow-2xl rounded-[2rem] border-none bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl overflow-hidden animate-in zoom-in-95 duration-500">
-        <CardContent className="space-y-6 pt-10 pb-10 px-6 sm:px-10">
+      <Card className="w-full shadow-2xl rounded-[2rem] border-none bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl overflow-hidden mb-6">
+        <CardContent className="space-y-4 pt-8 pb-8 px-6 sm:px-10">
+          <div className="bg-primary/5 dark:bg-primary/10 p-4 rounded-2xl border border-primary/10 flex items-center justify-between group cursor-pointer hover:bg-primary/10 transition-colors" onClick={() => router.push('/daily')}>
+             <div className="flex items-center gap-3">
+                <div className="bg-primary p-2 rounded-xl shadow-lg shadow-primary/20">
+                   <Calendar className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                   <h3 className="text-[10px] font-black uppercase tracking-tight">Today's Pulse</h3>
+                   <p className="text-[6px] font-bold text-muted-foreground uppercase">Daily Practice Set</p>
+                </div>
+             </div>
+             <ArrowRight className="h-4 w-4 text-primary group-hover:translate-x-1 transition-transform" />
+          </div>
+
           <Button
             onClick={handleCreateRoom}
-            className="w-full text-[9px] py-6 rounded-2xl shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98] group bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest"
+            className="w-full text-[8px] py-6 rounded-2xl shadow-xl transition-all hover:scale-[1.01] active:scale-[0.98] group bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest"
             disabled={isCreatingRoom || isJoiningRoom}
           >
-            {isCreatingRoom ? <Loader2 className="mr-3 animate-spin" /> : <Zap className="mr-3 fill-white group-hover:animate-bounce h-4 w-4" />}
-            {isCreatingRoom ? 'Generating Pulse...' : 'Launch Global Lobby'}
+            {isCreatingRoom ? <Loader2 className="mr-3 animate-spin" /> : <Zap className="mr-3 fill-white h-3 w-3" />}
+            {isCreatingRoom ? 'Generating...' : 'Host Global Lobby'}
           </Button>
 
-          <div className="relative">
+          <div className="relative py-2">
              <div className="absolute inset-0 flex items-center">
-               <span className="w-full border-t border-slate-200 dark:border-slate-800" />
+               <span className="w-full border-t border-slate-100 dark:border-slate-800" />
              </div>
-             <div className="relative flex justify-center text-[7px] uppercase tracking-[0.2em] font-black">
-               <span className="bg-white/90 dark:bg-slate-900 px-4 text-muted-foreground/60">
-                 Join Active Pulse
+             <div className="relative flex justify-center text-[6px] uppercase tracking-[0.2em] font-black">
+               <span className="bg-white/95 dark:bg-slate-900 px-4 text-muted-foreground/40">
+                 Sync Active Link
                </span>
              </div>
            </div>
 
-          <div className="flex flex-col space-y-4">
+          <div className="flex flex-col space-y-3">
             <Input
               type="text"
               placeholder="000000"
               value={roomCodeInput}
               onChange={(e) => setRoomCodeInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              className="text-center text-xl sm:text-2xl font-mono tracking-[0.3em] h-14 rounded-2xl border-2 dark:border-slate-800 focus-visible:ring-primary/40 bg-slate-50/50 dark:bg-slate-950/50 font-black"
+              className="text-center text-xl font-mono tracking-[0.3em] h-12 rounded-xl border-2 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 font-black"
               maxLength={6}
-              inputMode="numeric"
               disabled={isCreatingRoom || isJoiningRoom}
             />
             <Button
               onClick={handleJoinRoom}
               variant="outline"
-              className="w-full text-[9px] py-5 rounded-2xl border-2 hover:bg-primary/5 dark:hover:bg-primary/10 hover:border-primary/40 transition-all font-black dark:border-slate-800 uppercase tracking-widest"
+              className="w-full text-[8px] py-5 rounded-xl border-2 hover:bg-primary/5 transition-all font-black dark:border-slate-800 uppercase tracking-widest"
               disabled={roomCodeInput.length !== 6 || isJoiningRoom || isCreatingRoom}
             >
-               {isJoiningRoom ? <Loader2 className="mr-3 animate-spin h-4 w-4" /> : <Users className="mr-3 h-4 w-4" />}
-               {isJoiningRoom ? 'Syncing...' : 'Enter Game'}
+               {isJoiningRoom ? <Loader2 className="mr-2 animate-spin h-3 w-3" /> : <Users className="mr-2 h-3 w-3" />}
+               Join Game
             </Button>
           </div>
         </CardContent>
-         <CardFooter className="text-[7px] text-muted-foreground/40 text-center justify-center uppercase font-black tracking-[0.4em] pb-8">
-            Fastest Finger First Challenge
-         </CardFooter>
       </Card>
       
-      <AdBanner className="mt-8 w-full max-w-md border-none bg-transparent opacity-40 hover:opacity-100 transition-opacity" />
+      <div className="w-full flex justify-center opacity-30 hover:opacity-100 transition-opacity">
+        <Button variant="ghost" size="sm" className="text-[6px] font-black uppercase tracking-[0.3em]" onClick={() => router.push('/admin/daily')}>Owner Portal</Button>
+      </div>
+      <AdBanner className="mt-6 w-full border-none bg-transparent opacity-40" />
     </div>
   );
 };

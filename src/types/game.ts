@@ -25,12 +25,15 @@ export interface GameState {
   isGameOver?: boolean;
   isShowingResults?: boolean;
   currentRound: number;
-
   roundStartTime: Timestamp | FieldValue | null;
-
-  // ✅ FIX HERE
   createdAt?: Timestamp | FieldValue;
-
   customQuestions?: CustomQuestion[];
   currentQuestionIndex?: number;
+}
+
+export interface DailyChallenge {
+  id: string; // YYYY-MM-DD
+  questions: CustomQuestion[];
+  active: boolean;
+  updatedAt: Timestamp | FieldValue;
 }
