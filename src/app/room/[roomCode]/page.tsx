@@ -46,6 +46,7 @@ const GameRoomPage: NextPage = () => {
   const [autoCalcAns, setAutoCalcAns] = useState<number | null>(null);
 
   const roundEndTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const skipTransitionRef = useRef<boolean>(false);
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
   const evaluateExpression = (expr: string): number | null => {
@@ -147,6 +148,7 @@ const GameRoomPage: NextPage = () => {
             setGameState(prev => {
                 if (prev?.currentRound !== data.currentRound && data.isGameActive && !data.isShowingResults) {
                     setRoundTimeLeft(ROUND_DURATION);
+                    skipTransitionRef.current = false;
                 }
                 return { ...data, roomCode };
             });
@@ -297,17 +299,18 @@ const GameRoomPage: NextPage = () => {
     }, RESULTS_DISPLAY_DURATION);
   }, [gameState, isHost, updateFirestoreState, nextQuestion]);
 
+  // Separate Effect for Progression logic to avoid timer interrupts
   useEffect(() => {
-    if (!isHost || !gameState?.isGameActive || gameState.isShowingResults || !gameState.players || gameState.players.length === 0) return;
+    if (!isHost || !gameState?.isGameActive || gameState.isShowingResults || !gameState.players || gameState.players.length === 0 || skipTransitionRef.current) return;
     
     const allAnswered = gameState.players.every(p => p.hasAnswered);
     const allCorrect = gameState.players.every(p => p.isCorrect === true);
 
     if (allCorrect) {
-       const timer = setTimeout(() => {
+       skipTransitionRef.current = true;
+       setTimeout(() => {
           nextQuestion();
        }, ALL_CORRECT_SKIP_DELAY);
-       return () => clearTimeout(timer);
     } else if (allAnswered || roundTimeLeft <= 0) {
         endRound();
     }
