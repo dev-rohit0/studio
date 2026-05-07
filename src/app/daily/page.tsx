@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Calendar, Trophy, ArrowLeft, Activity } from 'lucide-react';
+import { Loader2, Calendar, Trophy, ArrowLeft, Activity, Clock } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import type { DailyChallenge } from '@/types/game';
@@ -23,6 +23,7 @@ const DailyPulsePage: NextPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [score, setScore] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState(20);
   
   const router = useRouter();
   const { toast } = useToast();
@@ -46,9 +47,37 @@ const DailyPulsePage: NextPage = () => {
     fetchDailyChallenge();
   }, []);
 
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isStarted && !isFinished && !isLoading) {
+      interval = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+             toast({ title: "Time's Up!", variant: "destructive" });
+             moveToNext();
+             return 20;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isStarted, isFinished, isLoading, currentIndex]);
+
   const handleStart = () => {
     setIsStarted(true);
     setStartTime(Date.now());
+    setTimeLeft(20);
+  };
+
+  const moveToNext = () => {
+    if (challenge && currentIndex + 1 < challenge.questions.length) {
+      setCurrentIndex(prev => prev + 1);
+      setCurrentAnswer('');
+      setTimeLeft(20);
+    } else {
+      setIsFinished(true);
+    }
   };
 
   const handleAnswerSubmit = (e: React.FormEvent) => {
@@ -58,12 +87,7 @@ const DailyPulsePage: NextPage = () => {
     const correctAns = challenge.questions[currentIndex].answer;
     if (parseFloat(currentAnswer) === correctAns) {
       setScore(prev => prev + 100);
-      if (currentIndex + 1 < challenge.questions.length) {
-        setCurrentIndex(prev => prev + 1);
-        setCurrentAnswer('');
-      } else {
-        setIsFinished(true);
-      }
+      moveToNext();
     } else {
       toast({ title: "Incorrect Pulse", variant: "destructive" });
       setCurrentAnswer('');
@@ -91,7 +115,7 @@ const DailyPulsePage: NextPage = () => {
   if (isFinished) {
     const timeTaken = startTime ? Math.floor((Date.now() - startTime) / 1000) : 0;
     return (
-      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 bg-slate-50 dark:bg-slate-950">
+      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 bg-slate-100 dark:bg-slate-950">
         <Card className="w-full max-w-md shadow-2xl border-none rounded-[2.5rem] bg-white/95 dark:bg-slate-900/95 p-8 text-center animate-in zoom-in-95 duration-500">
            <Trophy className="h-12 w-12 text-yellow-500 mx-auto mb-6" />
            <CardTitle className="text-lg font-black uppercase tracking-tighter mb-2">Pulse Completed</CardTitle>
@@ -101,7 +125,7 @@ const DailyPulsePage: NextPage = () => {
                  <p className="text-lg font-black text-primary">{score}</p>
               </div>
               <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
-                 <p className="text-[7px] font-black text-muted-foreground uppercase mb-1">Time</p>
+                 <p className="text-[7px] font-black text-muted-foreground uppercase mb-1">Total Time</p>
                  <p className="text-lg font-black text-primary">{timeTaken}s</p>
               </div>
            </div>
@@ -113,14 +137,14 @@ const DailyPulsePage: NextPage = () => {
 
   if (!isStarted) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 bg-slate-50 dark:bg-slate-950">
+      <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 bg-slate-100 dark:bg-slate-950">
         <Card className="w-full max-w-md shadow-2xl border-none rounded-[2.5rem] bg-white/95 dark:bg-slate-900/95 p-10 text-center">
            <Calendar className="h-10 w-10 text-primary mx-auto mb-6" />
            <CardTitle className="text-lg font-black uppercase tracking-tighter mb-2">Daily Pulse Challenge</CardTitle>
            <CardDescription className="text-[8px] font-bold uppercase tracking-widest mb-8">Set for {new Date().toLocaleDateString()}</CardDescription>
            <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10 mb-8">
               <p className="text-[8px] font-black uppercase text-primary leading-relaxed">
-                 {challenge.questions.length} Equations • No Timers • Pure Precision
+                 {challenge.questions.length} Equations • 20s Per Question • High Speed
               </p>
            </div>
            <Button onClick={handleStart} className="w-full h-14 rounded-xl text-[9px] font-black uppercase tracking-widest text-white shadow-xl">INITIATE PULSE</Button>
@@ -133,7 +157,7 @@ const DailyPulsePage: NextPage = () => {
   const currentQ = challenge.questions[currentIndex];
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 bg-slate-50 dark:bg-slate-950">
+    <div className="flex flex-col items-center justify-center min-h-dvh w-full p-4 bg-slate-100 dark:bg-slate-950">
       <div className="absolute top-4 left-4">
          <Button variant="ghost" size="sm" onClick={() => router.push('/')} className="h-8 w-8 p-0 rounded-full bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm"><ArrowLeft className="h-4 w-4" /></Button>
       </div>
@@ -143,7 +167,10 @@ const DailyPulsePage: NextPage = () => {
 
       <div className="w-full max-w-lg space-y-6">
          <div className="flex justify-between items-center px-4">
-            <span className="text-[7px] font-black uppercase tracking-widest text-muted-foreground">Pulse Progression</span>
+            <div className="flex items-center gap-2">
+               <Clock className={`h-3 w-3 ${timeLeft < 5 ? 'text-destructive animate-pulse' : 'text-primary'}`} />
+               <span className={`text-[8px] font-black font-mono ${timeLeft < 5 ? 'text-destructive' : 'text-primary'}`}>{timeLeft}s</span>
+            </div>
             <span className="text-[8px] font-black font-mono">{currentIndex + 1} / {challenge.questions.length}</span>
          </div>
          <Progress value={((currentIndex) / challenge.questions.length) * 100} className="h-1.5 mx-4" />

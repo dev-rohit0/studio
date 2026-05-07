@@ -187,6 +187,7 @@ const GameRoomPage: NextPage = () => {
   };
 
   const endGame = useCallback(async () => {
+    if (!db) return;
     await updateFirestoreState({
         isGameActive: false,
         isGameOver: true,
@@ -196,7 +197,7 @@ const GameRoomPage: NextPage = () => {
   }, [updateFirestoreState]);
 
   const startGame = useCallback(async () => {
-    if (!gameState || !isHost || gameState.isGameActive) return;
+    if (!gameState || !isHost || gameState.isGameActive || !db) return;
 
     let nextQ: string;
     let nextA: number;
@@ -236,7 +237,7 @@ const GameRoomPage: NextPage = () => {
   }, [gameState, isHost, updateFirestoreState]);
 
   const nextQuestion = useCallback(async () => {
-    if (!gameState || !isHost || !gameState.isGameActive) return;
+    if (!gameState || !isHost || !gameState.isGameActive || !db) return;
     if (roundEndTimeoutRef.current) clearTimeout(roundEndTimeoutRef.current);
 
     let nextQ: string;
@@ -280,7 +281,7 @@ const GameRoomPage: NextPage = () => {
   }, [gameState, isHost, updateFirestoreState, endGame]);
 
   const endRound = useCallback(async () => {
-    if (!gameState || !isHost || gameState.isShowingResults || !gameState.isGameActive) return;
+    if (!gameState || !isHost || gameState.isShowingResults || !gameState.isGameActive || !db) return;
 
     const updatedPlayers = gameState.players.map(p => ({
         ...p,
@@ -299,12 +300,11 @@ const GameRoomPage: NextPage = () => {
     }, RESULTS_DISPLAY_DURATION);
   }, [gameState, isHost, updateFirestoreState, nextQuestion]);
 
-  // Separate Effect for Progression logic to avoid timer interrupts
   useEffect(() => {
     if (!isHost || !gameState?.isGameActive || gameState.isShowingResults || !gameState.players || gameState.players.length === 0 || skipTransitionRef.current) return;
     
-    const allAnswered = gameState.players.every(p => p.hasAnswered);
     const allCorrect = gameState.players.every(p => p.isCorrect === true);
+    const allAnswered = gameState.players.every(p => p.hasAnswered);
 
     if (allCorrect) {
        skipTransitionRef.current = true;
@@ -410,6 +410,7 @@ const GameRoomPage: NextPage = () => {
   };
 
   const handleResetLobby = async () => {
+    if (!db) return;
     await updateFirestoreState({
         isGameOver: false,
         isGameActive: false,
