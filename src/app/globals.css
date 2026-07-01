@@ -2,61 +2,150 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-}
-
 @layer base {
   :root {
-    --background: 210 17% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222 47% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 142 71% 45%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 1rem;
+    /* ── MathPulse raw tokens (match HTML exactly) ── */
+    --ink:          #0A0D12;
+    --panel:        #11161F;
+    --panel-line:   #1E2530;
+    --paper:        #F4F2EC;
+    --paper-dim:    #A8AEBA;
+    --lime:         #C8FF4D;
+    --lime-dim:     #8FB838;
+    --signal:       #FF4D5E;
+
+    /* ── Shadcn tokens remapped so every ui/ component picks up the palette ── */
+    --background:          222 30% 7%;
+    --foreground:          46 33% 93%;
+    --card:                220 28% 10%;
+    --card-foreground:     46 33% 93%;
+    --popover:             220 28% 10%;
+    --popover-foreground:  46 33% 93%;
+    --primary:             77 100% 65%;
+    --primary-foreground:  222 30% 7%;
+    --secondary:           216 24% 15%;
+    --secondary-foreground:46 33% 93%;
+    --muted:               220 28% 10%;
+    --muted-foreground:    220 10% 69%;
+    --accent:              77 100% 65%;
+    --accent-foreground:   222 30% 7%;
+    --destructive:         354 100% 65%;
+    --destructive-foreground: 0 0% 100%;
+    --border:              216 24% 15%;
+    --input:               222 30% 7%;
+    --ring:                77 100% 65%;
+    --radius:              0.5rem;
+
+    /* sidebar (unused but keeps Shadcn happy) */
+    --sidebar-background:  220 28% 10%;
+    --sidebar-foreground:  46 33% 93%;
+    --sidebar-primary:     77 100% 65%;
+    --sidebar-primary-foreground: 222 30% 7%;
+    --sidebar-accent:      216 24% 15%;
+    --sidebar-accent-foreground: 46 33% 93%;
+    --sidebar-border:      216 24% 15%;
+    --sidebar-ring:        77 100% 65%;
   }
-  .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 142 71% 45%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+
+  /* light override — mirrors [data-theme="light"] from the HTML */
+  .light {
+    --ink:        #F4F2EC;
+    --panel:      #FFFFFF;
+    --panel-line: #E3E0D8;
+    --paper:      #15181D;
+    --paper-dim:  #6B7280;
+    --lime:       #5E8A1F;
+    --lime-dim:   #8FB838;
+    --signal:     #DC2626;
+
+    --background:          46 33% 93%;
+    --foreground:          222 16% 13%;
+    --card:                0 0% 100%;
+    --card-foreground:     222 16% 13%;
+    --popover:             0 0% 100%;
+    --popover-foreground:  222 16% 13%;
+    --primary:             90 63% 33%;
+    --primary-foreground:  0 0% 100%;
+    --secondary:           40 18% 88%;
+    --secondary-foreground:222 16% 13%;
+    --muted:               0 0% 100%;
+    --muted-foreground:    220 9% 44%;
+    --accent:              90 63% 33%;
+    --accent-foreground:   0 0% 100%;
+    --destructive:         354 80% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border:              40 18% 88%;
+    --input:               46 33% 93%;
+    --ring:                90 63% 33%;
+  }
+
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-inter), 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    transition: background 0.25s ease, color 0.25s ease;
+  }
+
+  ::selection {
+    background-color: var(--lime);
+    color: var(--ink);
+  }
+
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--panel-line); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--lime-dim); }
+
+  /* focus ring — matches the HTML's lime outline */
+  :focus-visible {
+    outline: 2px solid var(--lime);
+    outline-offset: 3px;
   }
 }
 
-@layer base {
-  * {
-    @apply border-border;
+@layer utilities {
+  .font-display   { font-family: var(--font-space-grotesk), 'Space Grotesk', sans-serif; }
+  .font-jetbrains { font-family: var(--font-jetbrains-mono), 'JetBrains Mono', monospace; }
+
+  /* bg/text/border helpers using raw CSS vars so they work on any component */
+  .bg-ink        { background-color: var(--ink); }
+  .bg-panel      { background-color: var(--panel); }
+  .bg-panel-line { background-color: var(--panel-line); }
+  .text-paper    { color: var(--paper); }
+  .text-paper-dim{ color: var(--paper-dim); }
+  .text-lime     { color: var(--lime); }
+  .text-lime-dim { color: var(--lime-dim); }
+  .text-signal   { color: var(--signal); }
+  .border-panel-line { border-color: var(--panel-line); }
+  .border-lime   { border-color: var(--lime); }
+  .border-lime-dim{ border-color: var(--lime-dim); }
+
+  /* pulse dot animation */
+  .animate-dot-pulse {
+    animation: dotpulse 1.6s ease-out infinite;
   }
-  body {
-    @apply bg-background text-foreground;
+  @keyframes dotpulse {
+    0%   { box-shadow: 0 0 0 0   rgba(255,77,94,.55); }
+    70%  { box-shadow: 0 0 0 10px rgba(255,77,94,0); }
+    100% { box-shadow: 0 0 0 0   rgba(255,77,94,0); }
+  }
+
+  /* waveform scroll */
+  .animate-wave-scroll {
+    animation: waveScroll 6s linear infinite;
+  }
+  @keyframes waveScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-dot-pulse,
+    .animate-wave-scroll { animation: none; }
   }
 }

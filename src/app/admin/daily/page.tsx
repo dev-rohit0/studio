@@ -21,7 +21,7 @@ const DailyAdminPage: NextPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [passKey, setPassKey] = useState('');
-  
+
   const router = useRouter();
   const { toast } = useToast();
   const today = new Date().toISOString().split('T')[0];
@@ -96,79 +96,152 @@ const DailyAdminPage: NextPage = () => {
 
   if (!isAuthorized) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-dvh p-4 bg-slate-50 dark:bg-slate-950">
-        <Card className="w-full max-w-sm shadow-2xl border-none rounded-[2rem] bg-white/95 dark:bg-slate-900/95 p-8 text-center">
-           <Lock className="h-8 w-8 text-primary mx-auto mb-4" />
-           <CardTitle className="text-sm font-black uppercase tracking-widest mb-6">Owner Authorization</CardTitle>
-           <Input 
-             type="password" 
-             placeholder="ENTER ACCESS KEY..." 
-             value={passKey} 
-             onChange={(e) => setPassKey(e.target.value)}
-             className="text-center h-12 rounded-xl border-2 mb-4 font-bold"
-           />
-           <Button onClick={() => passKey === 'pulse-owner-2024' ? setIsAuthorized(true) : toast({ title: 'Invalid Key', variant: 'destructive' })} className="w-full h-12 rounded-xl text-[8px] font-black uppercase tracking-widest text-white">ACCESS PORTAL</Button>
-           <Button variant="ghost" onClick={() => router.push('/')} className="mt-2 text-[6px] font-bold uppercase text-muted-foreground">Return Home</Button>
+      <div className="flex flex-col items-center justify-center min-h-dvh p-4 bg-ink relative overflow-hidden">
+        {/* faint grid backdrop, matches landing hero */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.18]"
+          style={{
+            backgroundImage:
+              'linear-gradient(#1E2530 1px, transparent 1px), linear-gradient(90deg, #1E2530 1px, transparent 1px)',
+            backgroundSize: '64px 64px',
+            maskImage: 'radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 90%)',
+          }}
+        />
+        <Card className="relative w-full max-w-sm border border-panelLine rounded-2xl bg-panel p-8 text-center">
+          <div className="mx-auto mb-5 flex h-11 w-11 items-center justify-center rounded-xl border border-limeDim bg-lime/10">
+            <Lock className="h-5 w-5 text-lime" />
+          </div>
+          <CardTitle className="font-display text-lg font-bold text-paper mb-1">Owner Authorization</CardTitle>
+          <p className="font-mono text-[11px] tracking-[0.14em] uppercase text-paperDim mb-6">
+            Restricted · global pulse console
+          </p>
+          <Input
+            type="password"
+            placeholder="Enter access key"
+            value={passKey}
+            onChange={(e) => setPassKey(e.target.value)}
+            className="h-12 rounded-lg border border-panelLine bg-ink text-center font-mono text-sm text-paper placeholder:text-paperDim mb-4 focus-visible:ring-lime focus-visible:ring-offset-0"
+          />
+          <Button
+            onClick={() =>
+              passKey === 'pulse-owner-2024'
+                ? setIsAuthorized(true)
+                : toast({ title: 'Invalid Key', variant: 'destructive' })
+            }
+            className="w-full h-12 rounded-lg bg-lime text-ink hover:bg-limeDim font-semibold text-sm tracking-wide"
+          >
+            Access portal
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => router.push('/')}
+            className="mt-2 text-xs font-medium text-paperDim hover:text-paper hover:bg-transparent"
+          >
+            Return home
+          </Button>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-dvh w-full max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
-      <div className="flex items-center justify-between">
-         <Button variant="ghost" onClick={() => router.push('/')} className="h-9 rounded-xl text-[7px] font-black uppercase"><ArrowLeft className="mr-2 h-3 w-3" /> Dashboard</Button>
-         <div className="bg-primary/5 px-4 py-1.5 rounded-full border border-primary/10">
-            <span className="text-[7px] font-black text-primary uppercase tracking-widest">Global Pulse Console</span>
-         </div>
+    <div className="flex flex-col min-h-dvh w-full max-w-2xl mx-auto p-4 sm:p-6 space-y-6 bg-ink">
+      <div className="flex items-center justify-between pt-4">
+        <Button
+          variant="ghost"
+          onClick={() => router.push('/')}
+          className="h-9 rounded-lg text-xs font-semibold text-paperDim hover:text-paper hover:bg-panel"
+        >
+          <ArrowLeft className="mr-2 h-3.5 w-3.5" /> Dashboard
+        </Button>
+        <div className="flex items-center gap-2 rounded-full border border-limeDim bg-lime/5 px-4 py-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-signal animate-pulse" />
+          <span className="font-mono text-[11px] font-medium tracking-[0.12em] uppercase text-lime">
+            Global Pulse Console
+          </span>
+        </div>
       </div>
 
-      <Card className="shadow-2xl border-none rounded-[2.5rem] bg-white/95 dark:bg-slate-900/95 overflow-hidden">
-         <CardHeader className="pt-8 pb-4 text-center">
-            <CardTitle className="text-lg font-black uppercase tracking-tighter">Daily Challenge Builder</CardTitle>
-            <CardDescription className="text-[7px] font-bold uppercase tracking-widest text-primary">Auto-Calculating Pool: {today}</CardDescription>
-         </CardHeader>
-         <CardContent className="p-6 sm:p-10 space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-               <Input 
-                placeholder="EQUATION (e.g. 15 x 12)" 
-                value={newQ} 
-                onChange={(e) => setNewQ(e.target.value)} 
-                className="h-12 rounded-xl border-2 text-[8px] font-bold uppercase" 
-               />
-               <div className="flex gap-2">
-                  <Input 
-                    type="number" 
-                    placeholder="RESULT" 
-                    value={newA} 
-                    onChange={(e) => setNewA(e.target.value)} 
-                    className="h-12 rounded-xl border-2 text-[8px] font-bold uppercase bg-slate-50 dark:bg-slate-950/50" 
-                  />
-                  <Button onClick={handleAddQuestion} className="h-12 w-12 rounded-xl text-white shadow-lg"><Plus className="h-5 w-5" /></Button>
-               </div>
-            </div>
+      <Card className="border border-panelLine rounded-2xl bg-panel overflow-hidden">
+        <CardHeader className="pt-8 pb-4 text-center">
+          <CardTitle className="font-display text-xl font-bold tracking-tight text-paper">
+            Daily Challenge Builder
+          </CardTitle>
+          <CardDescription className="font-mono text-[11px] font-medium tracking-[0.12em] uppercase text-lime mt-1">
+            Auto-calculating pool · {today}
+          </CardDescription>
+        </CardHeader>
 
-            <div className="space-y-2">
-               <p className="text-[6px] font-black uppercase tracking-widest text-muted-foreground mb-2">Deployed Stack ({questions.length})</p>
-               <ScrollArea className="h-[250px] rounded-2xl border-2 border-slate-50 dark:border-slate-800 p-2 bg-slate-50/50 dark:bg-slate-950/50">
-                  {questions.length === 0 ? (
-                    <div className="flex items-center justify-center h-[200px] text-[7px] font-black uppercase text-muted-foreground/40 italic">Empty Pulse Stack</div>
-                  ) : (
-                    questions.map((q, i) => (
-                      <div key={i} className="flex justify-between items-center p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl mb-2 shadow-sm">
-                         <span className="font-mono font-black text-[9px]">{q.question} = {q.answer}</span>
-                         <Button variant="ghost" size="sm" onClick={() => handleRemove(i)} className="text-destructive hover:bg-destructive/10 rounded-lg"><Trash2 className="h-3.5 w-3.5" /></Button>
-                      </div>
-                    ))
-                  )}
-               </ScrollArea>
+        <CardContent className="p-6 sm:p-10 space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              placeholder="Equation (e.g. 15 × 12)"
+              value={newQ}
+              onChange={(e) => setNewQ(e.target.value)}
+              className="h-12 rounded-lg border border-panelLine bg-ink font-mono text-sm text-paper placeholder:text-paperDim focus-visible:ring-lime focus-visible:ring-offset-0"
+            />
+            <div className="flex gap-2">
+              <Input
+                type="number"
+                placeholder="Result"
+                value={newA}
+                onChange={(e) => setNewA(e.target.value)}
+                className="h-12 rounded-lg border border-panelLine bg-ink font-mono text-sm text-paper placeholder:text-paperDim focus-visible:ring-lime focus-visible:ring-offset-0"
+              />
+              <Button
+                onClick={handleAddQuestion}
+                className="h-12 w-12 shrink-0 rounded-lg bg-lime text-ink hover:bg-limeDim"
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
             </div>
+          </div>
 
-            <Button onClick={handleSave} disabled={isSaving || questions.length === 0} className="w-full h-14 rounded-2xl text-[9px] font-black uppercase tracking-widest text-white shadow-xl shadow-primary/20">
-               {isSaving ? <Loader2 className="mr-3 animate-spin" /> : <Save className="mr-3 h-4 w-4" />}
-               DEPLOY TO GLOBAL PULSE
-            </Button>
-         </CardContent>
+          <div className="space-y-2">
+            <p className="font-mono text-[11px] font-medium tracking-[0.12em] uppercase text-paperDim mb-2">
+              Deployed stack ({questions.length})
+            </p>
+            <ScrollArea className="h-[250px] rounded-xl border border-panelLine bg-ink/40 p-2">
+              {questions.length === 0 ? (
+                <div className="flex items-center justify-center h-[200px] font-mono text-xs uppercase tracking-wide text-paperDim/50 italic">
+                  Empty pulse stack
+                </div>
+              ) : (
+                questions.map((q, i) => (
+                  <div
+                    key={i}
+                    className="flex justify-between items-center p-3 bg-panel border border-panelLine rounded-lg mb-2"
+                  >
+                    <span className="font-mono text-sm font-medium text-paper">
+                      {q.question} = <span className="text-lime">{q.answer}</span>
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemove(i)}
+                      className="text-signal hover:bg-signal/10 hover:text-signal rounded-md"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </ScrollArea>
+          </div>
+
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || questions.length === 0}
+            className="w-full h-14 rounded-xl bg-lime text-ink hover:bg-limeDim font-semibold text-sm tracking-wide disabled:opacity-40"
+          >
+            {isSaving ? (
+              <Loader2 className="mr-3 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-3 h-4 w-4" />
+            )}
+            Deploy to global pulse
+          </Button>
+        </CardContent>
       </Card>
     </div>
   );
