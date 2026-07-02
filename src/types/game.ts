@@ -13,6 +13,7 @@ export interface Player {
   hasAnswered?: boolean;
   isCorrect?: boolean | null;
   lastActive?: Timestamp | null;
+  stolenPoints: number
 }
 
 export interface GameState {
@@ -29,6 +30,14 @@ export interface GameState {
   createdAt?: Timestamp | FieldValue;
   customQuestions?: CustomQuestion[];
   currentQuestionIndex?: number;
+  // GameState
+difficulty:           'easy' | 'medium' | 'hard'
+roundCount:           number
+roundType:            'exact' | 'estimation'
+estimationOptions:    string[]
+firstCorrectPlayerId: string | null
+reactions:            Array<{ id: string; playerId: string; playerName: string; emoji: string; ts: number }>
+
 }
 
 export interface DailyChallenge {
@@ -37,3 +46,4 @@ export interface DailyChallenge {
   active: boolean;
   updatedAt: Timestamp | FieldValue;
 }
+
