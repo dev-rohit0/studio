@@ -713,27 +713,58 @@ const GameRoomPage: NextPage = () => {
             </div>
             {/* podium */}
             <div style={{ padding:'28px 24px', display:'flex', alignItems:'flex-end', justifyContent:'center', gap:12, borderBottom:`1px solid ${T.line}` }}>
-              {display.map((player,i)=>{
-                const r = i===0?1:i===1?0:2;
-                if (!player) return <div key={i} style={{ width:72 }}/>;
-                return (
-                  <div key={player.id} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
-                    <div style={{ position:'relative' }}>
-                      <div style={{ width:r===0?52:40,height:r===0?52:40,borderRadius:'50%',background:T.line,border:`2px solid ${rnkColors[r]}`,display:'flex',alignItems:'center',justifyContent:'center',fontFamily:T.mono,fontWeight:700,fontSize:r===0?18:14,color:rnkColors[r] }}>
-                        {player.name[0].toUpperCase()}
-                      </div>
-                      <div style={{ position:'absolute',bottom:-2,right:-2,width:18,height:18,borderRadius:'50%',background:T.panel,border:`1px solid ${T.line}`,display:'flex',alignItems:'center',justifyContent:'center',color:rnkColors[r] }}>
-                        {rnkIcon[r]}
-                      </div>
-                    </div>
-                    <span style={{ fontFamily:T.mono,fontSize:11,color:rnkColors[r],fontWeight:700,maxWidth:60,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{player.name}</span>
-                    <div style={{ width:r===0?72:56,height:rnkH[r],background:`rgba(${r===0?'200,255,77':r===2?'245,158,11':'168,174,186'},.1)`,border:`1px solid ${rnkColors[r]}`,borderBottom:'none',borderRadius:'6px 6px 0 0',display:'flex',alignItems:'flex-start',justifyContent:'center',paddingTop:10 }}>
-                      <span style={{ fontFamily:T.mono,fontSize:12,fontWeight:700,color:rnkColors[r] }}>{rnkLabel[r]}</span>
-                    </div>
-                    <span style={{ fontFamily:T.mono,fontSize:13,fontWeight:700,color:rnkColors[r] }}>{player.score}</span>
-                  </div>
-                );
-              })}
+            {display.map((player, i) => {
+  if (!player) return <div key={i} style={{ width:72 }}/>;
+  return (
+    <div key={player.id} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:8 }}>
+      <div style={{ position:'relative' }}>
+        <div style={{
+          width: i===1 ? 52 : 40,
+          height: i===1 ? 52 : 40,
+          borderRadius:'50%', background:T.line,
+          border:`2px solid ${rnkColors[i]}`,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          fontFamily:T.mono, fontWeight:700,
+          fontSize: i===1 ? 18 : 14,
+          color: rnkColors[i],
+        }}>
+          {player.name[0].toUpperCase()}
+        </div>
+        <div style={{
+          position:'absolute', bottom:-2, right:-2,
+          width:18, height:18, borderRadius:'50%',
+          background:T.panel, border:`1px solid ${T.line}`,
+          display:'flex', alignItems:'center', justifyContent:'center',
+          color: rnkColors[i],
+        }}>
+          {rnkIcon[i]}
+        </div>
+      </div>
+      <span style={{
+        fontFamily:T.mono, fontSize:11,
+        color: rnkColors[i], fontWeight:700,
+        maxWidth:60, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+      }}>
+        {player.name}
+      </span>
+      <div style={{
+        width: i===1 ? 72 : 56,
+        height: rnkH[i],
+        background:`rgba(${i===1?'200,255,77':i===2?'245,158,11':'168,174,186'},.1)`,
+        border:`1px solid ${rnkColors[i]}`,
+        borderBottom:'none', borderRadius:'6px 6px 0 0',
+        display:'flex', alignItems:'flex-start', justifyContent:'center', paddingTop:10,
+      }}>
+        <span style={{ fontFamily:T.mono, fontSize:12, fontWeight:700, color:rnkColors[i] }}>
+          {rnkLabel[i]}
+        </span>
+      </div>
+      <span style={{ fontFamily:T.mono, fontSize:13, fontWeight:700, color:rnkColors[i] }}>
+        {player.score}
+      </span>
+    </div>
+  );
+})}
             </div>
             {/* full standings */}
             <div style={{ padding:'14px 18px 8px' }}>
