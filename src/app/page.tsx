@@ -92,6 +92,13 @@ const HomePage: NextPage = () => {
       question: 'Waiting for host...', answer: 0, players: [], timeLeft: 0,
       isGameActive: false, currentRound: 0, roundStartTime: null,
       createdAt: serverTimestamp(), customQuestions: [], currentQuestionIndex: 0,
+      // v2 feature fields
+      difficulty: 'medium',
+      roundCount: 10,
+      roundType: 'exact',
+      estimationOptions: [],
+      firstCorrectPlayerId: null,
+      reactions: [],
     };
     try {
       await setDoc(doc(db!, 'gameRooms', code), init);
